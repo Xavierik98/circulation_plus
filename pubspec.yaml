@@ -1,0 +1,47 @@
+name: circulation_plus
+description: Circulation+ — National Digital Traffic Enforcement Platform for the Republic of Congo.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Navigation
+  go_router: ^14.2.0
+
+  # Animations
+  flutter_animate: ^4.5.0
+  lottie: ^3.1.0
+
+  # Charts
+  fl_chart: ^0.68.0
+
+  # Fonts & UI
+  google_fonts: ^6.2.1
+  shimmer: ^3.0.0
+
+  # Storage
+  shared_preferences: ^2.3.1
+
+  # Utilities
+  intl: ^0.20.2
+  uuid: ^4.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+

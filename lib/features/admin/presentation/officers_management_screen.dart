@@ -1,47 +1,40 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/officer_model.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../../../data/providers.dart';
 
-class OfficersManagementScreen extends StatefulWidget {
+class OfficersManagementScreen extends ConsumerStatefulWidget {
   const OfficersManagementScreen({super.key});
 
   @override
-  State<OfficersManagementScreen> createState() => _OfficersManagementScreenState();
+  ConsumerState<OfficersManagementScreen> createState() =>
+      _OfficersManagementScreenState();
 }
 
-class _OfficersManagementScreenState extends State<OfficersManagementScreen> {
+class _OfficersManagementScreenState
+    extends ConsumerState<OfficersManagementScreen> {
   OfficerStatus? _filterStatus;
   String _searchQuery = '';
 
-  List<OfficerModel> get _filteredOfficers {
-    var officers = OfficerModel.mockOfficers;
-    if (_filterStatus != null) {
-      officers = officers.where((o) => o.status == _filterStatus).toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      officers = officers.where((o) =>
-          o.fullName.toLowerCase().contains(q) ||
-          o.badgeNumber.toLowerCase().contains(q) ||
-          o.zone.toLowerCase().contains(q)).toList();
-    }
-    return officers;
+  List<OfficerModel> _applyStatus(List<OfficerModel> officers) {
+    if (_filterStatus == null) return officers;
+    return officers.where((o) => o.status == _filterStatus).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final officersAsync = ref.watch(officersProvider(_searchQuery));
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         title: Text('Gestion des agents', style: AppTextStyles.titleMedium),
-        actions: [
-          IconButton(icon: const Icon(Icons.person_add_outlined, size: 20), onPressed: () {}),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
           child: Container(height: 3, decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
@@ -51,17 +44,39 @@ class _OfficersManagementScreenState extends State<OfficersManagementScreen> {
         children: [
           _buildSearchBar(),
           _buildFilterBar(),
-          _buildSummaryRow(),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredOfficers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                return _OfficerCard(officer: _filteredOfficers[i])
-                    .animate(delay: Duration(milliseconds: i * 60))
-                    .fadeIn(duration: 300.ms)
-                    .slideX(begin: 0.05);
+            child: officersAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text('Agents indisponibles.\n$e',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodyMedium),
+                ),
+              ),
+              data: (all) {
+                final officers = _applyStatus(all);
+                return Column(
+                  children: [
+                    _buildSummaryRow(all),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: officers.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          return _OfficerCard(officer: officers[i])
+                              .animate(delay: Duration(milliseconds: i * 60))
+                              .fadeIn(duration: 300.ms)
+                              .slideX(begin: 0.05);
+                        },
+                      ),
+                    ),
+                  ],
+                );
               },
             ),
           ),
@@ -126,8 +141,7 @@ class _OfficersManagementScreenState extends State<OfficersManagementScreen> {
     );
   }
 
-  Widget _buildSummaryRow() {
-    final all = OfficerModel.mockOfficers;
+  Widget _buildSummaryRow(List<OfficerModel> all) {
     final active = all.where((o) => o.status == OfficerStatus.active).length;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

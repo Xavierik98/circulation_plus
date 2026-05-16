@@ -6,6 +6,7 @@ import '../../../../theme/app_colors.dart';
 import '../../../../theme/app_text_styles.dart';
 import '../../../../shared/models/infraction_model.dart';
 import '../../../../shared/widgets/premium_button.dart';
+import '../../../../data/providers.dart';
 
 final _selectedInfractionsProvider = StateProvider<List<InfractionType>>((ref) => []);
 
@@ -20,9 +21,9 @@ class InfractionSelectionScreen extends ConsumerStatefulWidget {
 class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionScreen> {
   InfractionCategory? _selectedCategory;
 
-  List<InfractionType> get _filteredInfractions {
-    if (_selectedCategory == null) return InfractionType.all;
-    return InfractionType.all.where((i) => i.category == _selectedCategory).toList();
+  List<InfractionType> _filter(List<InfractionType> all) {
+    if (_selectedCategory == null) return all;
+    return all.where((i) => i.category == _selectedCategory).toList();
   }
 
   @override
@@ -69,32 +70,54 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
 
           // List
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredInfractions.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final inf = _filteredInfractions[index];
-                final isSelected = selected.contains(inf);
-                return _InfractionTile(
-                  infraction: inf,
-                  isSelected: isSelected,
-                  onToggle: () {
-                    ref.read(_selectedInfractionsProvider.notifier).update((list) {
-                      final newList = List<InfractionType>.from(list);
-                      if (isSelected) {
-                        newList.remove(inf);
-                      } else {
-                        newList.add(inf);
-                      }
-                      return newList;
-                    });
+            child: ref.watch(infractionsProvider).when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Catalogue indisponible.\n$e',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ),
+                  ),
+                  data: (all) {
+                    final list = _filter(all);
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final inf = list[index];
+                        final isSelected =
+                            selected.any((s) => s.id == inf.id);
+                        return _InfractionTile(
+                          infraction: inf,
+                          isSelected: isSelected,
+                          onToggle: () {
+                            ref
+                                .read(_selectedInfractionsProvider.notifier)
+                                .update((current) {
+                              final newList =
+                                  List<InfractionType>.from(current);
+                              if (isSelected) {
+                                newList.removeWhere((s) => s.id == inf.id);
+                              } else {
+                                newList.add(inf);
+                              }
+                              return newList;
+                            });
+                          },
+                        )
+                            .animate(delay: Duration(milliseconds: index * 50))
+                            .fadeIn(duration: 300.ms)
+                            .slideX(begin: 0.05, end: 0);
+                      },
+                    );
                   },
-                ).animate(delay: Duration(milliseconds: index * 50))
-                    .fadeIn(duration: 300.ms)
-                    .slideX(begin: 0.05, end: 0);
-              },
-            ),
+                ),
           ),
 
           // Bottom total bar

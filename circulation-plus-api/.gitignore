@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+coverage
+.storage-stub
+*.log
+.DS_Store

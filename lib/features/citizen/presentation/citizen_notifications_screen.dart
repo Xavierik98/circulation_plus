@@ -1,47 +1,62 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/notification_model.dart';
+import '../../../data/providers.dart';
 
-class CitizenNotificationsScreen extends StatelessWidget {
+class CitizenNotificationsScreen extends ConsumerWidget {
   const CitizenNotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final notifications = NotificationModel.mockCitizenNotifications;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notificationsAsync = ref.watch(notificationsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         title: Text('Notifications', style: AppTextStyles.titleMedium),
-        actions: [
-          TextButton(
-            onPressed: () {},
-            child: Text('Tout lire', style: AppTextStyles.labelSmall.copyWith(color: AppColors.success)),
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
           child: Container(height: 3, decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
         ),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: notifications.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final n = notifications[i];
-          return _NotifCard(n: n, onTap: () {
-            if (n.actionId != null) {
-              context.push('/citizen/fine/${n.actionId}');
-            }
-          })
-              .animate(delay: Duration(milliseconds: i * 80))
-              .fadeIn(duration: 300.ms)
-              .slideX(begin: 0.05);
+      body: notificationsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Notifications indisponibles.\n$e',
+                textAlign: TextAlign.center, style: AppTextStyles.bodyMedium),
+          ),
+        ),
+        data: (notifications) {
+          if (notifications.isEmpty) {
+            return Center(
+              child: Text('Aucune notification',
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textTertiary)),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: notifications.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, i) {
+              final n = notifications[i];
+              return _NotifCard(n: n, onTap: () {
+                if (n.actionId != null) {
+                  context.push('/citizen/fine/${n.actionId}');
+                }
+              })
+                  .animate(delay: Duration(milliseconds: i * 80))
+                  .fadeIn(duration: 300.ms)
+                  .slideX(begin: 0.05);
+            },
+          );
         },
       ),
     );

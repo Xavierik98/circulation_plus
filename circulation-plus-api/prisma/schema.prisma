@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  POLICE
+  CITOYEN
+  ADMIN
+}
+
+enum FineStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CONTESTED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum ConvocationStatus {
+  PENDING
+  SMS1_SENT
+  SMS2_SENT
+  APPEARED
+  DEFAULTER
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  pinHash     String
+  role        Role
+  name        String
+  badgeNumber String?  @unique // Agents uniquement
+  telephone   String?
+  actif       Boolean  @default(true)
+  // Token Firebase Cloud Messaging du terminal de l'agent (ajout : le spec exige
+  // un push FCM mais ne stocke aucun token ; la Notification reste le canal durable).
+  fcmToken    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  finesAsOfficer Fine[]         @relation("OfficerFines")
+  finesAsCitizen Fine[]         @relation("CitizenFines")
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+
+  @@index([email])
+  @@index([badgeNumber])
+}
+
+model InfractionType {
+  id                     String   @id @default(uuid())
+  code                   String   @unique
+  libelle                String
+  montantBase            Int // XAF
+  convocationObligatoire Boolean  @default(false)
+  actif                  Boolean  @default(true)
+  updatedAt              DateTime @updatedAt
+
+  fines Fine[]
+}
+
+model Driver {
+  id           String   @id @default(uuid())
+  nom          String
+  prenom       String
+  telephone    String
+  numeroPermis String   @unique
+  permisValide Boolean  @default(true)
+  consentement Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  vehicles     Vehicle[]
+  fines        Fine[]
+  convocations Convocation[]
+}
+
+model Vehicle {
+  id        String   @id @default(uuid())
+  plaque    String   @unique
+  marque    String?
+  modele    String?
+  couleur   String?
+  driverId  String?
+  driver    Driver?  @relation(fields: [driverId], references: [id])
+  createdAt DateTime @default(now())
+
+  fines Fine[]
+}
+
+model Fine {
+  id        String @id @default(uuid())
+  reference String @unique // PV-YYYY-XXXXXX
+
+  officerId String
+  officer   User   @relation("OfficerFines", fields: [officerId], references: [id])
+
+  citizenId String?
+  citizen   User?   @relation("CitizenFines", fields: [citizenId], references: [id])
+
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  infractionTypeId String
+  infractionType   InfractionType @relation(fields: [infractionTypeId], references: [id])
+
+  montantAmende     Int // XAF
+  montantMajoration Int @default(0)
+  montantTotal      Int
+
+  latitude      Float?
+  longitude     Float?
+  adresseApprox String?
+
+  // Horodatage : verbaliseLe = valeur client validée ; createdAt = vérité serveur
+  verbaliseLe DateTime
+  dateEcheance DateTime
+
+  signatureAgent        String?
+  signatureContrevenant String?
+  refusSignature        Boolean @default(false)
+
+  status FineStatus @default(PENDING)
+
+  pdfUrl String? // URL Cloudflare R2
+
+  // Sync offline
+  deviceId  String?
+  synchedAt DateTime?
+
+  payment     Payment?
+  convocation Convocation?
+  auditLogs   AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([officerId])
+  @@index([status])
+  @@index([verbaliseLe])
+}
+
+model Payment {
+  id     String @id @default(uuid())
+  fineId String @unique
+  fine   Fine   @relation(fields: [fineId], references: [id])
+
+  montantTotal Int
+  operateur    String // "MTN" | "AIRTEL"
+  telephone    String
+
+  transactionId String        @unique
+  status        PaymentStatus @default(PENDING)
+
+  initiatedAt DateTime  @default(now())
+  confirmedAt DateTime?
+
+  repartition Repartition?
+
+  @@index([transactionId])
+}
+
+model Repartition {
+  id        String  @id @default(uuid())
+  paymentId String  @unique
+  payment   Payment @relation(fields: [paymentId], references: [id])
+
+  partDeveloppeur Int // 1 000 XAF fixe
+  partAgent       Int
+  partPolice      Int
+  partTresor      Int
+
+  developpeurVerse Boolean @default(false)
+  agentVerse       Boolean @default(false)
+  policeVerse      Boolean @default(false)
+  tresorVerse      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model Convocation {
+  id       String @id @default(uuid())
+  fineId   String @unique
+  fine     Fine   @relation(fields: [fineId], references: [id])
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id])
+
+  motif           String
+  dateConvocation DateTime
+  lieu            String
+
+  sms1SentAt DateTime?
+  sms2SentAt DateTime?
+  status     ConvocationStatus @default(PENDING)
+  appearedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  title String
+  body  String
+  type  String // "fine_created" | "payment_confirmed" | "convocation" | ...
+  read  Boolean @default(false)
+  data  Json? // Payload additionnel (fineId, etc.)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model AuditLog {
+  id     String  @id @default(uuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+  fineId String?
+  fine   Fine?   @relation(fields: [fineId], references: [id])
+
+  action  String
+  details Json?
+  ip      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model LicenseVerification {
+  id           String   @id @default(uuid())
+  numeroPermis String
+  valide       Boolean
+  details      Json?
+  verifiedAt   DateTime @default(now())
+
+  @@index([numeroPermis])
+}
+
+// Compteur de séquence annuel pour générer "reference" (PV-YYYY-NNNNNN)
+// de façon sûre sous concurrence (verrou de ligne en transaction).
+model FineCounter {
+  year    Int @id
+  lastSeq Int @default(0)
+}

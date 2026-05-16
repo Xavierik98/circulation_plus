@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,9 +18,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _identifierController = TextEditingController();
-  final _otpController = TextEditingController();
-  bool _otpSent = false;
+  final _emailController = TextEditingController();
+  final _pinController = TextEditingController();
   bool _isLoading = false;
 
   late UserRole _userRole;
@@ -67,29 +66,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
-    _identifierController.dispose();
-    _otpController.dispose();
+    _emailController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOtp() async {
-    if (_identifierController.text.isEmpty) return;
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    setState(() {
-      _isLoading = false;
-      _otpSent = true;
-    });
-    _showSnack('Code OTP envoyé au +242 06 *** **23', isSuccess: true);
-  }
-
   Future<void> _login() async {
-    if (_otpController.text.isEmpty) return;
+    if (_emailController.text.isEmpty || _pinController.text.isEmpty) {
+      _showSnack('Renseignez votre email et votre code PIN');
+      return;
+    }
     setState(() => _isLoading = true);
     final success = await ref.read(authProvider.notifier).login(
           role: _userRole,
-          identifier: _identifierController.text,
-          otp: _otpController.text,
+          email: _emailController.text.trim(),
+          pin: _pinController.text.trim(),
         );
     setState(() => _isLoading = false);
 
@@ -124,7 +115,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   const SizedBox(height: 16),
 
-                  // Back button
                   GestureDetector(
                     onTap: () => context.pop(),
                     child: Container(
@@ -142,7 +132,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 40),
 
-                  // Role badge
                   if (_userRole == UserRole.police)
                     const PncBadge(size: 68, showGlow: true)
                         .animate()
@@ -186,21 +175,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 40),
 
-                  // Identifier field
-                  _buildLabel(_userRole == UserRole.police ? 'Matricule Agent' : 'Numéro National / Téléphone'),
+                  // Email
+                  _buildLabel('Email'),
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _identifierController,
-                    keyboardType: _userRole == UserRole.police
-                        ? TextInputType.text
-                        : TextInputType.phone,
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
                     style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: _userRole == UserRole.police ? 'Ex: PNB-4521' : '+242 06 000 0000',
+                    decoration: const InputDecoration(
+                      hintText: 'agent1@pnc.cg',
                       prefixIcon: Icon(
-                        _userRole == UserRole.police
-                            ? Icons.badge_rounded
-                            : Icons.phone_rounded,
+                        Icons.alternate_email_rounded,
                         color: AppColors.primary,
                         size: 20,
                       ),
@@ -208,73 +194,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textInputAction: TextInputAction.next,
                   ).animate().fadeIn(delay: 400.ms),
 
-                  if (_otpSent) ...[
-                    const SizedBox(height: 20),
-                    _buildLabel('Code OTP'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _otpController,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: AppTextStyles.titleMedium.copyWith(
-                        letterSpacing: 8,
-                        color: AppColors.primary,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '• • • • • •',
-                        hintStyle: AppTextStyles.titleMedium.copyWith(
-                          color: AppColors.textDisabled,
-                          letterSpacing: 6,
-                        ),
-                        counterText: '',
-                        prefixIcon: const Icon(
-                          Icons.lock_outline_rounded,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        suffixText: 'Renvoyer',
-                        suffixStyle: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _login(),
-                    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.3),
+                  const SizedBox(height: 20),
 
-                    const SizedBox(height: 8),
-                    Text(
-                      'Conseil : utilisez "1234" pour ce démo',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary.withValues(alpha: 0.6),
+                  // PIN
+                  _buildLabel('Code PIN'),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _pinController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 12,
+                    obscureText: true,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: AppTextStyles.titleMedium.copyWith(
+                      letterSpacing: 8,
+                      color: AppColors.primary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '• • • •',
+                      hintStyle: AppTextStyles.titleMedium.copyWith(
+                        color: AppColors.textDisabled,
+                        letterSpacing: 6,
                       ),
-                    ).animate().fadeIn(delay: 200.ms),
-                  ],
+                      counterText: '',
+                      prefixIcon: const Icon(
+                        Icons.lock_outline_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _login(),
+                  ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.3),
+
+                  const SizedBox(height: 8),
+                  Text(
+                    'Démo : PIN "0000" (admin@pnc.cg, agent1@pnc.cg…)',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary.withValues(alpha: 0.6),
+                    ),
+                  ).animate().fadeIn(delay: 500.ms),
 
                   const SizedBox(height: 32),
 
-                  // CTA Button
                   PremiumButton(
-                    label: _otpSent ? 'Se connecter' : 'Envoyer le code OTP',
+                    label: 'Se connecter',
                     isLoading: _isLoading,
                     gradient: _roleGradient,
-                    icon: _otpSent ? Icons.login_rounded : Icons.send_rounded,
-                    onPressed: _isLoading ? null : (_otpSent ? _login : _sendOtp),
-                  ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.3),
-
-                  const SizedBox(height: 16),
-
-                  // Demo hint
-                  if (!_otpSent)
-                    Center(
-                      child: Text(
-                        'Entrez n\'importe quel identifiant pour démarrer',
-                        style: AppTextStyles.caption.copyWith(color: AppColors.textDisabled),
-                        textAlign: TextAlign.center,
-                      ),
-                    ).animate().fadeIn(delay: 600.ms),
+                    icon: Icons.login_rounded,
+                    onPressed: _isLoading ? null : _login,
+                  ).animate().fadeIn(delay: 550.ms).slideY(begin: 0.3),
 
                   const SizedBox(height: 40),
 
-                  // Security badge
                   Center(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -332,7 +303,6 @@ class _LoginBgPainter extends CustomPainter {
     canvas.drawCircle(
         Offset(size.width * 0.85, size.height * 0.12), size.width * 0.75, paint);
 
-    // Bottom-left glow
     final paint2 = Paint()
       ..shader = RadialGradient(
         colors: [AppColors.primary.withValues(alpha: 0.04), Colors.transparent],

@@ -9,12 +9,24 @@ class AppConstants {
   static const String dgst = 'DGST — Direction Générale des Services Techniques';
   static const String country = 'République du Congo';
 
+  // Backend API
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:3000',
+  );
+
   // Shared Preferences Keys
   static const String prefLocale = 'locale';
   static const String prefUserRole = 'user_role';
   static const String prefUserId = 'user_id';
+  static const String prefUserName = 'user_name';
+  static const String prefUserBadge = 'user_badge';
   static const String prefDarkMode = 'dark_mode';
   static const String prefOnboarded = 'onboarded';
+
+  // Secure storage keys (tokens)
+  static const String secureAccessToken = 'access_token';
+  static const String secureRefreshToken = 'refresh_token';
 
   // Durations
   static const Duration splashDuration = Duration(seconds: 3);

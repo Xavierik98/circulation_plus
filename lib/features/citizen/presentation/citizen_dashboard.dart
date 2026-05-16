@@ -1,42 +1,68 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../../../data/providers.dart';
 
-class CitizenDashboard extends StatelessWidget {
+class CitizenDashboard extends ConsumerWidget {
   const CitizenDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final fines = FineModel.mockFines;
-    final pending = fines.where((f) => f.status == FineStatus.pending || f.status == FineStatus.overdue).toList();
-    final totalDebt = pending.fold<int>(0, (s, f) => s + f.amount);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final finesAsync = ref.watch(myFinesProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(context),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: 16),
-                _buildProfileBanner(totalDebt, pending.length),
-                const SizedBox(height: 24),
-                _buildActiveFines(context, pending),
-                const SizedBox(height: 24),
-                _buildPaidHistory(context, fines),
-                const SizedBox(height: 24),
-                _buildAlerts(),
-                const SizedBox(height: 100),
-              ]),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.refresh(myFinesProvider.future);
+        },
+        child: finesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Impossible de charger vos contraventions.\n$e',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium,
+              ),
             ),
           ),
-        ],
+          data: (fines) {
+            final pending = fines
+                .where((f) =>
+                    f.status == FineStatus.pending ||
+                    f.status == FineStatus.overdue)
+                .toList();
+            final totalDebt = pending.fold<int>(0, (s, f) => s + f.amount);
+            return CustomScrollView(
+              slivers: [
+                _buildAppBar(context),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      const SizedBox(height: 16),
+                      _buildProfileBanner(totalDebt, pending.length),
+                      const SizedBox(height: 24),
+                      _buildActiveFines(context, pending),
+                      const SizedBox(height: 24),
+                      _buildPaidHistory(context, fines),
+                      const SizedBox(height: 24),
+                      _buildAlerts(),
+                      const SizedBox(height: 100),
+                    ]),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

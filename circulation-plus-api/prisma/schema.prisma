@@ -118,9 +118,10 @@ model Fine {
   infractionTypeId String
   infractionType   InfractionType @relation(fields: [infractionTypeId], references: [id])
 
-  montantAmende     Int // XAF
-  montantMajoration Int @default(0)
-  montantTotal      Int
+  montantAmende      Int // XAF — montant officiel de l'infraction
+  montantDeveloppeur Int @default(1000) // 1 000 XAF — frais plateforme Circulation+
+  montantMajoration  Int @default(0)
+  montantTotal       Int // = montantAmende + montantDeveloppeur + montantMajoration
 
   latitude      Float?
   longitude     Float?

@@ -159,7 +159,13 @@ export async function confirmPayment(
       data: {
         fineId: payment.fineId,
         action: 'PAYMENT_CONFIRMED',
-        details: { transactionId: payment.transactionId, ...parts },
+        details: {
+          transactionId: payment.transactionId,
+          ...parts,
+          // Traçabilité des comptes destinataires
+          compteDeveloppeur: env.COMPTE_DEVELOPPEUR ?? 'non configuré',
+          comptePolice: env.COMPTE_POLICE ?? 'non configuré',
+        },
         ip,
       },
     });

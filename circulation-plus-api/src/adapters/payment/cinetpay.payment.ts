@@ -31,7 +31,11 @@ export class CinetPayPaymentProvider implements PaymentProvider {
         transaction_id: input.reference,
         amount: input.amount,
         currency: 'XAF',
-        channels: input.operator === 'MTN' ? 'MOBILE_MONEY' : 'MOBILE_MONEY',
+        // CinetPay détecte l'opérateur via le préfixe du numéro (06/05 = MTN, 04/07 = Airtel)
+        // On force le canal MOBILE_MONEY dans les deux cas ; CinetPay gère le routage.
+        channels: 'MOBILE_MONEY',
+        // Métadonnée utile pour le rapprochement comptable
+        metadata: input.operator,
         customer_phone_number: input.phone,
         description: `Paiement contravention ${input.reference}`,
         notify_url: `${this.config.baseUrl}/api/payments/confirm`,

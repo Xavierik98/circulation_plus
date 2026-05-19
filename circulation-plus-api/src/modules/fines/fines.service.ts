@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { prisma } from '../../config/database';
+import { env } from '../../config/env';
 import type { Adapters } from '../../adapters/types';
 import type { AuthUser } from '../../types/fastify';
 import { AppError } from '../../shared/errors/AppError';
@@ -120,7 +121,8 @@ export async function createFine(
   const verbaliseLe = new Date(body.verbaliseLe);
   const dateEcheance = new Date(verbaliseLe.getTime() + 30 * 24 * 3600 * 1000);
   const montantAmende = infractionType.montantBase;
-  const montantTotal = montantAmende; // majoration = 0 à la création
+  const montantDeveloppeur = env.PART_DEVELOPPEUR; // 1 000 XAF → compte développeurs
+  const montantTotal = montantAmende + montantDeveloppeur; // total payé par le contrevenant
 
   // Rattachement best-effort à un compte citoyen (téléphone identique).
   const citizen = await prisma.user.findFirst({
@@ -141,6 +143,7 @@ export async function createFine(
         vehicleId,
         infractionTypeId: infractionType.id,
         montantAmende,
+        montantDeveloppeur,
         montantMajoration: 0,
         montantTotal,
         latitude: body.latitude ?? null,

@@ -50,6 +50,12 @@ const envSchema = z.object({
   PART_POLICE: z.coerce.number().int().nonnegative().default(0),
   PART_TRESOR: z.coerce.number().int().nonnegative().default(0),
 
+  // Comptes Mobile Money de versement (MTN ou Airtel Congo)
+  // COMPTE_DEVELOPPEUR : numéro recevant les 1 000 XAF de frais plateforme
+  // COMPTE_POLICE      : numéro recevant la part amende officielle (police/trésor)
+  COMPTE_DEVELOPPEUR: optionalStr,
+  COMPTE_POLICE: optionalStr,
+
   // Convocations
   DELAI_CONVOCATION_JOURS: z.coerce.number().int().positive().default(7),
   DELAI_RELANCE_JOURS: z.coerce.number().int().positive().default(14),

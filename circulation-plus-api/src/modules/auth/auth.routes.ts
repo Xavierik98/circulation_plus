@@ -7,11 +7,31 @@ import {
   loginBodySchema,
   refreshBodySchema,
   logoutBodySchema,
+  registerBodySchema,
 } from './auth.schema';
-import { login, refresh, logout, getMe } from './auth.service';
+import { login, refresh, logout, getMe, register } from './auth.service';
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
+
+  // POST /api/auth/register — PUBLIC, auto-inscription citoyen.
+  r.post(
+    '/register',
+    {
+      config: { rateLimit: LOGIN_RATE_LIMIT },
+      schema: {
+        tags: ['Auth'],
+        summary: 'Inscription citoyen (auto-inscription publique)',
+        description: 'Crée un compte CITOYEN. Codes : EMAIL_ALREADY_USED (409).',
+        body: registerBodySchema,
+      },
+    },
+    async (request) => {
+      const { name, email, telephone, pin } = request.body;
+      const result = await register(name, email, telephone, pin, request.ip);
+      return ok(result);
+    },
+  );
 
   // POST /api/auth/login — PUBLIC, limité à 10 req/min/IP.
   r.post(

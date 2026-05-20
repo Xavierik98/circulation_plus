@@ -28,6 +28,15 @@ export const userPublicSchema = z.object({
   actif: z.boolean().optional(),
 });
 
+// Inscription citoyen (auto-inscription publique)
+export const registerBodySchema = z.object({
+  name:      z.string().min(2).max(80),
+  email:     z.string().email(),
+  telephone: z.string().min(8).max(20),
+  pin:       z.string().min(4).max(12).regex(/^\d+$/, 'PIN doit être numérique'),
+});
+export type RegisterBody = z.infer<typeof registerBodySchema>;
+
 export const loginResponseSchema = z.object({
   success: z.literal(true),
   data: z.object({

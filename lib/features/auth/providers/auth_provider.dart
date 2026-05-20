@@ -4,6 +4,17 @@ import '../../../core/constants/app_constants.dart';
 import '../../../data/api_client.dart';
 import '../../../data/repositories.dart';
 
+// ── Comptes de démonstration (actifs quand le backend est injoignable) ────────
+// Même identifiants que le seed Prisma : email / PIN 0000
+const _demoUsers = {
+  'admin@pnc.cg':    {'id': 'demo-admin',   'role': 'ADMIN',   'name': 'Administrateur PNC',  'badgeNumber': null},
+  'agent1@pnc.cg':   {'id': 'demo-agent1',  'role': 'POLICE',  'name': 'Jean Mbemba',          'badgeNumber': 'PNC-2024-001'},
+  'agent2@pnc.cg':   {'id': 'demo-agent2',  'role': 'POLICE',  'name': 'Aline Okemba',         'badgeNumber': 'PNC-2024-002'},
+  'agent3@pnc.cg':   {'id': 'demo-agent3',  'role': 'POLICE',  'name': 'Patrick Loubota',      'badgeNumber': 'PNC-2024-003'},
+  'citoyen1@pnc.cg': {'id': 'demo-cit1',   'role': 'CITOYEN', 'name': 'Marie Samba',          'badgeNumber': null},
+  'citoyen2@pnc.cg': {'id': 'demo-cit2',   'role': 'CITOYEN', 'name': 'Thomas Ngolo',         'badgeNumber': null},
+};
+
 enum UserRole { police, citizen, admin, none }
 
 UserRole _roleFromBackend(String? upper) {
@@ -99,6 +110,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
+      // ── Tentative de connexion sur le backend ────────────────────────────
       final user = await _repo.login(email, pin, role.name);
       await _persist(user);
       state = AuthState(
@@ -109,12 +121,80 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } on ApiException catch (e) {
+      // Erreur réseau (backend injoignable) → mode démo offline
+      if (e.code == 'NETWORK_ERROR') {
+        return _loginDemo(email, pin);
+      }
+      // Erreur métier (mauvais identifiants, etc.) → on affiche le message
+      state = state.copyWith(isLoading: false, error: e.message);
+      return false;
+    } catch (_) {
+      // Autre erreur inattendue → tenter le mode démo
+      return _loginDemo(email, pin);
+    }
+  }
+
+  /// Mode démo offline : comptes prédéfinis, PIN universel 0000.
+  /// Activé automatiquement quand le backend est injoignable.
+  bool _loginDemo(String email, String pin) {
+    if (pin != '0000') {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Backend injoignable — Mode démo : utilisez PIN "0000"',
+      );
+      return false;
+    }
+    final demoUser = _demoUsers[email.toLowerCase().trim()];
+    if (demoUser == null) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Backend injoignable — Mode démo\n'
+            'Comptes : agent1@pnc.cg · citoyen1@pnc.cg · admin@pnc.cg\n'
+            'PIN : 0000',
+      );
+      return false;
+    }
+    state = AuthState(
+      role: _roleFromBackend(demoUser['role']),
+      userId: demoUser['id'],
+      userName: demoUser['name'],
+      badgeNumber: demoUser['badgeNumber'],
+      error: '⚡ Mode démo — backend non connecté',
+    );
+    return true;
+  }
+
+  Future<bool> register({
+    required String name,
+    required String email,
+    required String telephone,
+    required String pin,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final user = await _repo.register(name, email, telephone, pin);
+      await _persist(user);
+      state = AuthState(
+        role: _roleFromBackend(user['role'] as String?),
+        userId: user['id'] as String?,
+        userName: user['name'] as String?,
+        badgeNumber: user['badgeNumber'] as String?,
+      );
+      return true;
+    } on ApiException catch (e) {
+      if (e.code == 'NETWORK_ERROR') {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Backend injoignable — impossible de créer un compte en mode démo.',
+        );
+        return false;
+      }
       state = state.copyWith(isLoading: false, error: e.message);
       return false;
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Connexion impossible. Vérifiez votre réseau.',
+        error: 'Erreur lors de la création du compte.',
       );
       return false;
     }

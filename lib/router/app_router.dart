@@ -5,6 +5,7 @@ import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/role_selection_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/register_screen.dart';
 import '../features/police/presentation/police_shell.dart';
 import '../features/police/presentation/police_dashboard.dart';
 import '../features/police/presentation/driver_history_screen.dart';
@@ -46,7 +47,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuth = authState.isAuthenticated;
       final isPublicRoute = location.startsWith('/splash') ||
           location.startsWith('/role') ||
-          location.startsWith('/login');
+          location.startsWith('/login') ||
+          location.startsWith('/register');
 
       if (!isAuth && !isPublicRoute) return '/role';
       if (isAuth && isPublicRoute && !location.startsWith('/splash')) {
@@ -71,6 +73,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login/:role',
         builder: (context, state) => LoginScreen(role: state.pathParameters['role']!),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (_, __) => const RegisterScreen(),
       ),
 
       // Police Shell

@@ -227,10 +227,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.3),
 
                   const SizedBox(height: 8),
-                  Text(
-                    'Démo : PIN "0000" (admin@pnc.cg, agent1@pnc.cg…)',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary.withValues(alpha: 0.6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Text('Comptes de démonstration (PIN : 0000)',
+                              style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.primary, fontWeight: FontWeight.w600)),
+                        ]),
+                        const SizedBox(height: 4),
+                        Text('Police  →  agent1@pnc.cg',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+                        Text('Citoyen →  citoyen1@pnc.cg',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+                        Text('Admin   →  admin@pnc.cg',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+                      ],
                     ),
                   ).animate().fadeIn(delay: 500.ms),
 
@@ -243,6 +264,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     icon: Icons.login_rounded,
                     onPressed: _isLoading ? null : _login,
                   ).animate().fadeIn(delay: 550.ms).slideY(begin: 0.3),
+
+                  // Inscription — citoyen uniquement
+                  if (_userRole == UserRole.citizen) ...[
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.push('/register'),
+                        child: RichText(
+                          text: TextSpan(
+                            style: AppTextStyles.bodySmall,
+                            children: const [
+                              TextSpan(
+                                text: 'Pas encore de compte ? ',
+                                style: TextStyle(color: AppColors.textTertiary),
+                              ),
+                              TextSpan(
+                                text: 'Créer un compte',
+                                style: TextStyle(
+                                  color: AppColors.congoGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 600.ms),
+                  ],
 
                   const SizedBox(height: 40),
 

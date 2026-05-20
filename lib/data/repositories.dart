@@ -48,6 +48,28 @@ class AuthRepository {
     await _api.clearTokens();
   }
 
+  Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String telephone,
+    String pin,
+  ) async {
+    final data = await _api.post(
+      '/api/auth/register',
+      body: {
+        'name': name,
+        'email': email,
+        'telephone': telephone,
+        'pin': pin,
+      },
+    ) as Map<String, dynamic>;
+    await _api.saveTokens(
+      data['token'] as String,
+      data['refreshToken'] as String,
+    );
+    return data['user'] as Map<String, dynamic>;
+  }
+
   Future<bool> hasSession() => _api.hasAccessToken();
 }
 

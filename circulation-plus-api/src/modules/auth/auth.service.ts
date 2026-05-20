@@ -165,6 +165,35 @@ export async function revokeAllRefreshTokens(userId: string): Promise<void> {
   }
 }
 
+// Inscription citoyen — auto-inscription publique (rôle CITOYEN uniquement).
+export async function register(
+  name: string,
+  email: string,
+  telephone: string,
+  pin: string,
+  ip: string | null,
+): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw AppError.conflict(
+      'Un compte existe déjà avec cet email.',
+      'EMAIL_ALREADY_USED',
+    );
+  }
+
+  const pinHash = await bcrypt.hash(pin, 12);
+  const user = await prisma.user.create({
+    data: { email, name, telephone, pinHash, role: 'CITOYEN' },
+  });
+
+  const token = signAccessToken(user);
+  const refreshToken = await issueRefreshToken(user.id);
+
+  await audit(prisma, { userId: user.id, action: 'REGISTER', ip });
+
+  return { token, refreshToken, user: publicUser(user) };
+}
+
 export async function getMe(userId: string): Promise<ReturnType<typeof publicUser>> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {

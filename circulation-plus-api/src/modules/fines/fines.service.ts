@@ -201,6 +201,7 @@ export async function createFine(
     /* SMS non bloquant */
   }
 
+  // Notification in-app + push pour l'agent verbalisateur
   try {
     const officerUser = await prisma.user.findUnique({
       where: { id: officer.id },
@@ -216,6 +217,31 @@ export async function createFine(
     });
   } catch {
     /* notification non bloquante */
+  }
+
+  // Notification in-app + push pour le citoyen (si compte associé)
+  if (citizen?.id) {
+    try {
+      const citizenUser = await prisma.user.findUnique({
+        where: { id: citizen.id },
+        select: { fcmToken: true },
+      });
+      const echeanceStr = dateEcheance.toLocaleDateString('fr-FR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+      });
+      await notify(prisma, adapters.push, {
+        userId: citizen.id,
+        fcmToken: citizenUser?.fcmToken ?? null,
+        title: '⚠️ Nouvelle contravention reçue',
+        body:
+          `PV ${created.reference} — ${infractionType.libelle} — ` +
+          `${montantTotal} XAF à payer avant le ${echeanceStr}.`,
+        type: 'fine_received',
+        data: { fineId: created.id, reference: created.reference },
+      });
+    } catch {
+      /* notification citoyen non bloquante */
+    }
   }
 
   await audit(prisma, {

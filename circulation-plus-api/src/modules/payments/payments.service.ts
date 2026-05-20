@@ -181,12 +181,14 @@ export async function confirmPayment(
   const fresh = await prisma.payment.findUnique({
     where: { id: payment.id },
     include: {
-      fine: { include: { officer: true } },
+      fine: { include: { officer: true, citizen: true } },
     },
   });
   if (fresh && fresh.status === 'CONFIRMED') {
     const ref = fresh.fine.reference;
     const montant = fresh.montantTotal;
+
+    // SMS citoyen + agent
     try {
       await adapters.sms.send(
         fresh.telephone,
@@ -199,17 +201,35 @@ export async function confirmPayment(
     } catch {
       /* SMS non bloquant */
     }
+
+    // Notification in-app pour l'agent
     try {
       await notify(prisma, adapters.push, {
         userId: fresh.fine.officerId,
         fcmToken: fresh.fine.officer.fcmToken ?? null,
-        title: 'Paiement confirmé',
-        body: `PV ${ref} réglé (${montant} XAF). Restituez les pièces.`,
+        title: '✅ Paiement confirmé',
+        body: `PV ${ref} réglé (${montant} XAF). Restituez les pièces au conducteur.`,
         type: 'payment_confirmed',
         data: { fineId: fresh.fineId, reference: ref },
       });
     } catch {
       /* notification non bloquante */
+    }
+
+    // Notification in-app pour le citoyen (si compte associé)
+    if (fresh.fine.citizenId && fresh.fine.citizen) {
+      try {
+        await notify(prisma, adapters.push, {
+          userId: fresh.fine.citizenId,
+          fcmToken: fresh.fine.citizen.fcmToken ?? null,
+          title: '✅ Paiement reçu',
+          body: `Votre paiement pour le PV ${ref} (${montant} XAF) a bien été enregistré.`,
+          type: 'payment_confirmed',
+          data: { fineId: fresh.fineId, reference: ref },
+        });
+      } catch {
+        /* notification citoyen non bloquante */
+      }
     }
   }
 

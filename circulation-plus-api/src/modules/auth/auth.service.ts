@@ -19,6 +19,8 @@ const ROLE_MAP: Record<'police' | 'citizen' | 'admin', Role> = {
   admin: 'ADMIN',
 };
 
+const PNC_DOMAIN = '@pnc.cg';
+
 interface RefreshPayload {
   sub: string;
   jti: string;
@@ -57,6 +59,7 @@ function publicUser(user: User): {
   email: string;
   telephone: string | null;
   actif: boolean;
+  mustChangePassword: boolean;
 } {
   return {
     id: user.id,
@@ -66,6 +69,7 @@ function publicUser(user: User): {
     email: user.email,
     telephone: user.telephone,
     actif: user.actif,
+    mustChangePassword: user.mustChangePassword,
   };
 }
 
@@ -75,6 +79,14 @@ export async function login(
   role: 'police' | 'citizen' | 'admin',
   ip: string | null,
 ): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
+  // 0. Domaine @pnc.cg obligatoire pour les agents.
+  if (role === 'police' && !email.toLowerCase().endsWith(PNC_DOMAIN)) {
+    throw AppError.unauthorized(
+      `Les comptes agents doivent utiliser une adresse ${PNC_DOMAIN}`,
+      'INVALID_OFFICER_DOMAIN',
+    );
+  }
+
   // 1. Vérrou de compte (sans toucher la base).
   if (await redis.exists(lockKey(email))) {
     throw AppError.tooManyRequests(
@@ -200,4 +212,35 @@ export async function getMe(userId: string): Promise<ReturnType<typeof publicUse
     throw AppError.notFound('Utilisateur introuvable', 'USER_NOT_FOUND');
   }
   return publicUser(user);
+}
+
+// Changement de mot de passe (obligatoire au 1er login ou volontaire).
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+  ip: string | null,
+): Promise<ReturnType<typeof publicUser>> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw AppError.notFound('Utilisateur introuvable', 'USER_NOT_FOUND');
+  }
+
+  const valid = await bcrypt.compare(currentPassword, user.pinHash);
+  if (!valid) {
+    throw AppError.unauthorized('Mot de passe actuel incorrect', 'INVALID_CREDENTIALS');
+  }
+
+  const pinHash = await bcrypt.hash(newPassword, 12);
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { pinHash, mustChangePassword: false },
+  });
+
+  // Révoque tous les refresh tokens : force une nouvelle session propre.
+  await revokeAllRefreshTokens(userId);
+
+  await audit(prisma, { userId, action: 'PASSWORD_CHANGED', ip });
+
+  return publicUser(updated);
 }

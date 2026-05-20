@@ -43,7 +43,8 @@ model User {
   name        String
   badgeNumber String?  @unique // Agents uniquement
   telephone   String?
-  actif       Boolean  @default(true)
+  actif                Boolean  @default(true)
+  mustChangePassword   Boolean  @default(false) // Force le changement au 1er login
   // Token Firebase Cloud Messaging du terminal de l'agent (ajout : le spec exige
   // un push FCM mais ne stocke aucun token ; la Notification reste le canal durable).
   fcmToken    String?

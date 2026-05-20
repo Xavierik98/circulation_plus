@@ -8,8 +8,9 @@ import {
   refreshBodySchema,
   logoutBodySchema,
   registerBodySchema,
+  changePasswordSchema,
 } from './auth.schema';
-import { login, refresh, logout, getMe, register } from './auth.service';
+import { login, refresh, logout, getMe, register, changePassword } from './auth.service';
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -100,5 +101,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request) => ok(await getMe(request.user!.id)),
+  );
+
+  // POST /api/auth/change-password — authentifié (obligatoire si mustChangePassword).
+  r.post(
+    '/change-password',
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ['Auth'],
+        summary: 'Changement de mot de passe (ISO 27001/27005)',
+        description:
+          'Rôles autorisés : tous (authentifié). ' +
+          'Vérifie le mot de passe actuel, applique la politique de sécurité, ' +
+          'révoque tous les refresh tokens et remet mustChangePassword à false.',
+        security: [{ bearerAuth: [] }],
+        body: changePasswordSchema,
+      },
+    },
+    async (request) => {
+      const { currentPassword, newPassword } = request.body;
+      return ok(await changePassword(request.user!.id, currentPassword, newPassword, request.ip));
+    },
   );
 }

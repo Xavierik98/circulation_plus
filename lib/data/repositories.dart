@@ -70,6 +70,21 @@ class AuthRepository {
     return data['user'] as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    final data = await _api.post(
+      '/api/auth/change-password',
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    ) as Map<String, dynamic>;
+    // Backend returns publicUser directly (wrapped by ok() helper)
+    return data;
+  }
+
   Future<bool> hasSession() => _api.hasAccessToken();
 }
 
@@ -158,6 +173,12 @@ class OfficerRepository {
 
   Future<void> update(String id, Map<String, dynamic> body) =>
       _api.patch('/api/officers/$id', body: body);
+
+  /// Import en masse depuis un contenu CSV.
+  /// Retourne { created, skipped, errors, credentials }.
+  Future<Map<String, dynamic>> importCsv(String csvContent) async =>
+      await _api.post('/api/officers/import-csv',
+          body: {'csvContent': csvContent}) as Map<String, dynamic>;
 }
 
 class NotificationRepository {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +20,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _pinController = TextEditingController();
   bool _isLoading = false;
+  bool _passwordVisible = false;
 
   late UserRole _userRole;
   late String _roleTitle;
@@ -196,30 +196,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 20),
 
-                  // PIN
-                  _buildLabel('Code PIN'),
+                  // Mot de passe
+                  _buildLabel('Mot de passe'),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _pinController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 12,
-                    obscureText: true,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: AppTextStyles.titleMedium.copyWith(
-                      letterSpacing: 8,
-                      color: AppColors.primary,
+                    obscureText: !_passwordVisible,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
                     ),
                     decoration: InputDecoration(
-                      hintText: '• • • •',
-                      hintStyle: AppTextStyles.titleMedium.copyWith(
-                        color: AppColors.textDisabled,
-                        letterSpacing: 6,
-                      ),
-                      counterText: '',
+                      hintText: 'Votre mot de passe',
                       prefixIcon: const Icon(
                         Icons.lock_outline_rounded,
                         color: AppColors.primary,
                         size: 20,
+                      ),
+                      suffixIcon: GestureDetector(
+                        onTap: () => setState(() => _passwordVisible = !_passwordVisible),
+                        child: Icon(
+                          _passwordVisible
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                          color: AppColors.textTertiary, size: 20,
+                        ),
                       ),
                     ),
                     textInputAction: TextInputAction.done,
@@ -240,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Row(children: [
                           const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.primary),
                           const SizedBox(width: 6),
-                          Text('Comptes de démonstration (PIN : 0000)',
+                          Text('Comptes de démonstration',
                               style: AppTextStyles.caption.copyWith(
                                   color: AppColors.primary, fontWeight: FontWeight.w600)),
                         ]),
@@ -251,6 +251,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
                         Text('Admin   →  admin@pnc.cg',
                             style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+                        Text('Mot de passe démo : Demo@1234!',
+                            style: AppTextStyles.caption.copyWith(
+                                color: AppColors.primary, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ).animate().fadeIn(delay: 500.ms),

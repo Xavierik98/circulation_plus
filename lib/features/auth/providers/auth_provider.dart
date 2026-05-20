@@ -37,6 +37,7 @@ class AuthState {
   final String? badgeNumber;
   final String? telephone;
   final String? email;
+  final bool mustChangePassword;
   final bool isLoading;
   final String? error;
 
@@ -47,6 +48,7 @@ class AuthState {
     this.badgeNumber,
     this.telephone,
     this.email,
+    this.mustChangePassword = false,
     this.isLoading = false,
     this.error,
   });
@@ -68,6 +70,7 @@ class AuthState {
     String? badgeNumber,
     String? telephone,
     String? email,
+    bool? mustChangePassword,
     bool? isLoading,
     String? error,
   }) {
@@ -78,6 +81,7 @@ class AuthState {
       badgeNumber: badgeNumber ?? this.badgeNumber,
       telephone: telephone ?? this.telephone,
       email: email ?? this.email,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -103,6 +107,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         badgeNumber: user['badgeNumber'] as String?,
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
+        mustChangePassword: user['mustChangePassword'] as bool? ?? false,
       );
     } catch (_) {
       // Session invalide : on reste déconnecté.
@@ -138,6 +143,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         badgeNumber: user['badgeNumber'] as String?,
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
+        mustChangePassword: user['mustChangePassword'] as bool? ?? false,
       );
       return true;
     } on ApiException catch (e) {
@@ -157,10 +163,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Mode démo offline : comptes prédéfinis, PIN universel 0000.
   /// Activé automatiquement quand le backend est injoignable.
   bool _loginDemo(String email, String pin) {
-    if (pin != '0000') {
+    if (pin != 'Demo@1234!') {
       state = state.copyWith(
         isLoading: false,
-        error: 'Backend injoignable — Mode démo : utilisez PIN "0000"',
+        error: 'Backend injoignable — Mode démo : utilisez le mot de passe "Demo@1234!"',
       );
       return false;
     }
@@ -170,7 +176,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         error: 'Backend injoignable — Mode démo\n'
             'Comptes : agent1@pnc.cg · citoyen1@pnc.cg · admin@pnc.cg\n'
-            'PIN : 0000',
+            'Mot de passe : Demo@1234!',
       );
       return false;
     }
@@ -201,6 +207,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         badgeNumber: user['badgeNumber'] as String?,
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
+        mustChangePassword: user['mustChangePassword'] as bool? ?? false,
       );
       return true;
     } on ApiException catch (e) {
@@ -217,6 +224,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isLoading: false,
         error: 'Erreur lors de la création du compte.',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final user = await _repo.changePassword(currentPassword, newPassword);
+      await _persist(user);
+      state = state.copyWith(
+        isLoading: false,
+        mustChangePassword: false,
+        userName: user['name'] as String?,
+        error: null,
+      );
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Erreur lors du changement de mot de passe.',
       );
       return false;
     }

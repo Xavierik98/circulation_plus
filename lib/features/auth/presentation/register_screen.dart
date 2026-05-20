@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/widgets/premium_button.dart';
+import '../../../shared/widgets/password_strength_indicator.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -210,22 +210,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     const SizedBox(height: 18),
 
-                    // PIN
-                    _label('Code PIN (chiffres uniquement)'),
+                    // Mot de passe
+                    _label('Mot de passe'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _pinController,
-                      keyboardType: TextInputType.number,
-                      maxLength: 12,
                       obscureText: !_pinVisible,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: AppTextStyles.titleMedium.copyWith(
-                        letterSpacing: 8, color: AppColors.congoGreen),
+                      onChanged: (_) => setState(() {}),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        hintText: '• • • •',
-                        hintStyle: AppTextStyles.titleMedium.copyWith(
-                            color: AppColors.textDisabled, letterSpacing: 6),
-                        counterText: '',
+                        hintText: 'Ex: MonMotDePasse1!',
                         prefixIcon: const Icon(Icons.lock_outline_rounded,
                             color: AppColors.congoGreen, size: 20),
                         suffixIcon: GestureDetector(
@@ -238,40 +233,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ),
                         ),
                       ),
-                      validator: (v) {
-                        if (v == null || v.length < 4) {
-                          return 'PIN doit avoir au moins 4 chiffres';
-                        }
-                        return null;
-                      },
+                      validator: const PasswordPolicy().validate,
                     ).animate().fadeIn(delay: 450.ms),
+
+                    // Indicateur de force
+                    PasswordStrengthIndicator(password: _pinController.text)  // ignore: prefer_const_constructors
+                        .animate().fadeIn(delay: 460.ms),
 
                     const SizedBox(height: 18),
 
-                    // Confirmer PIN
-                    _label('Confirmer le code PIN'),
+                    // Confirmer mot de passe
+                    _label('Confirmer le mot de passe'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _confirmPinController,
-                      keyboardType: TextInputType.number,
-                      maxLength: 12,
                       obscureText: !_pinVisible,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: AppTextStyles.titleMedium.copyWith(
-                          letterSpacing: 8, color: AppColors.congoGreen),
-                      decoration: InputDecoration(
-                        hintText: '• • • •',
-                        hintStyle: AppTextStyles.titleMedium.copyWith(
-                            color: AppColors.textDisabled, letterSpacing: 6),
-                        counterText: '',
-                        prefixIcon: const Icon(Icons.lock_rounded,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary),
+                      decoration: const InputDecoration(
+                        hintText: 'Répétez votre mot de passe',
+                        prefixIcon: Icon(Icons.lock_rounded,
                             color: AppColors.congoGreen, size: 20),
                       ),
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _register(),
                       validator: (v) {
                         if (v != _pinController.text) {
-                          return 'Les PIN ne correspondent pas';
+                          return 'Les mots de passe ne correspondent pas';
                         }
                         return null;
                       },

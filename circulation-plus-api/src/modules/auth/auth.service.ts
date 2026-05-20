@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import type { Role, User } from '@prisma/client';
@@ -7,6 +7,7 @@ import { redis } from '../../config/redis';
 import { env } from '../../config/env';
 import { AppError } from '../../shared/errors/AppError';
 import { audit } from '../../shared/middleware/audit';
+import { sendVerificationEmail } from '../../config/email';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 jours
@@ -60,6 +61,7 @@ function publicUser(user: User): {
   telephone: string | null;
   actif: boolean;
   mustChangePassword: boolean;
+  emailVerified: boolean;
 } {
   return {
     id: user.id,
@@ -70,6 +72,7 @@ function publicUser(user: User): {
     telephone: user.telephone,
     actif: user.actif,
     mustChangePassword: user.mustChangePassword,
+    emailVerified: user.emailVerified,
   };
 }
 
@@ -121,6 +124,15 @@ export async function login(
   }
 
   await redis.del(failKey(email));
+
+  // Email non vérifié : bloquer uniquement les CITOYEN (les agents sont créés par l'admin)
+  if (user.role === 'CITOYEN' && !user.emailVerified) {
+    throw AppError.forbidden(
+      'Veuillez vérifier votre adresse email avant de vous connecter. '
+      + 'Consultez votre boîte mail et cliquez sur le lien d\'activation.',
+      'EMAIL_NOT_VERIFIED',
+    );
+  }
 
   const token = signAccessToken(user);
   const refreshToken = await issueRefreshToken(user.id);
@@ -184,7 +196,12 @@ export async function register(
   telephone: string,
   pin: string,
   ip: string | null,
-): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
+): Promise<{
+  user: ReturnType<typeof publicUser>;
+  // En mode stub (pas de SMTP), le lien de vérification est retourné en clair
+  // pour faciliter les tests. En production ce champ est absent.
+  verificationUrl?: string;
+}> {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     throw AppError.conflict(
@@ -194,16 +211,79 @@ export async function register(
   }
 
   const pinHash = await bcrypt.hash(pin, 12);
+  const emailVerificationToken = randomBytes(32).toString('hex');
+
   const user = await prisma.user.create({
-    data: { email, name, telephone, pinHash, role: 'CITOYEN' },
+    data: {
+      email,
+      name,
+      telephone,
+      pinHash,
+      role: 'CITOYEN',
+      emailVerified: false,
+      emailVerificationToken,
+    },
   });
 
-  const token = signAccessToken(user);
-  const refreshToken = await issueRefreshToken(user.id);
+  // Envoyer le mail de vérification (non bloquant)
+  void sendVerificationEmail(email, name, emailVerificationToken).catch((err) => {
+    console.error('[email] Échec envoi vérification :', err);
+  });
 
   await audit(prisma, { userId: user.id, action: 'REGISTER', ip });
 
-  return { token, refreshToken, user: publicUser(user) };
+  // En mode développement (pas de SMTP), inclure le lien dans la réponse API
+  const isStub = !process.env['SMTP_HOST'];
+  const verificationUrl = isStub
+    ? `${env.BASE_URL}/api/auth/verify-email?token=${emailVerificationToken}`
+    : undefined;
+
+  return { user: publicUser(user), verificationUrl };
+}
+
+// Vérification de l'email via token
+export async function verifyEmail(token: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { emailVerificationToken: token },
+  });
+  if (!user) {
+    throw AppError.badRequest(
+      'Lien de vérification invalide ou déjà utilisé.',
+      'INVALID_VERIFICATION_TOKEN',
+    );
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerified: true, emailVerificationToken: null },
+  });
+  await audit(prisma, { userId: user.id, action: 'EMAIL_VERIFIED', ip: null });
+}
+
+// Renvoi du mail de vérification
+export async function resendVerification(
+  email: string,
+  ip: string | null,
+): Promise<{ verificationUrl?: string }> {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.role !== 'CITOYEN' || user.emailVerified) return {};
+
+  // Générer un nouveau token
+  const emailVerificationToken = randomBytes(32).toString('hex');
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerificationToken },
+  });
+
+  void sendVerificationEmail(email, user.name, emailVerificationToken).catch(
+    (err) => console.error('[email] Échec renvoi :', err),
+  );
+
+  await audit(prisma, { userId: user.id, action: 'VERIFICATION_RESENT', ip });
+
+  const isStub = !process.env['SMTP_HOST'];
+  return isStub
+    ? { verificationUrl: `${env.BASE_URL}/api/auth/verify-email?token=${emailVerificationToken}` }
+    : {};
 }
 
 export async function getMe(userId: string): Promise<ReturnType<typeof publicUser>> {

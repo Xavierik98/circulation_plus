@@ -39,21 +39,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_pinController.text != _confirmPinController.text) {
-      _showSnack('Les codes PIN ne correspondent pas');
+      _showSnack('Les mots de passe ne correspondent pas');
       return;
     }
 
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).register(
+    final email = _emailController.text.trim();
+    final verificationUrl = await ref.read(authProvider.notifier).register(
       name:      _nameController.text.trim(),
-      email:     _emailController.text.trim(),
+      email:     email,
       telephone: _phoneController.text.trim(),
       pin:       _pinController.text.trim(),
     );
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (!success && mounted) {
+    if (verificationUrl == null) {
+      // Erreur
       _showSnack(ref.read(authProvider).error ?? 'Erreur lors de l\'inscription');
+    } else {
+      // Succès → écran de vérification
+      context.go(
+        '/verify-email',
+        extra: {'email': email, 'devUrl': verificationUrl},
+      );
     }
   }
 

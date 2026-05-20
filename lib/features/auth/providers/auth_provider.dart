@@ -38,6 +38,7 @@ class AuthState {
   final String? telephone;
   final String? email;
   final bool mustChangePassword;
+  final bool emailVerified;
   final bool isLoading;
   final String? error;
 
@@ -49,6 +50,7 @@ class AuthState {
     this.telephone,
     this.email,
     this.mustChangePassword = false,
+    this.emailVerified = true,
     this.isLoading = false,
     this.error,
   });
@@ -71,6 +73,7 @@ class AuthState {
     String? telephone,
     String? email,
     bool? mustChangePassword,
+    bool? emailVerified,
     bool? isLoading,
     String? error,
   }) {
@@ -82,6 +85,7 @@ class AuthState {
       telephone: telephone ?? this.telephone,
       email: email ?? this.email,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      emailVerified: emailVerified ?? this.emailVerified,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -108,6 +112,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
+        emailVerified: user['emailVerified'] as bool? ?? true,
       );
     } catch (_) {
       // Session invalide : on reste déconnecté.
@@ -144,6 +149,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
+        emailVerified: user['emailVerified'] as bool? ?? true,
       );
       return true;
     } on ApiException catch (e) {
@@ -190,7 +196,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return true;
   }
 
-  Future<bool> register({
+  /// Inscription citoyen. Retourne `null` si échec, sinon la `verificationUrl`
+  /// (non-null en mode dev/stub, null si SMTP configuré).
+  Future<String?> register({
     required String name,
     required String email,
     required String telephone,
@@ -198,34 +206,66 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final user = await _repo.register(name, email, telephone, pin);
-      await _persist(user);
-      state = AuthState(
-        role: _roleFromBackend(user['role'] as String?),
-        userId: user['id'] as String?,
-        userName: user['name'] as String?,
-        badgeNumber: user['badgeNumber'] as String?,
-        telephone: user['telephone'] as String?,
+      final data = await _repo.register(name, email, telephone, pin);
+      final user = data['user'] as Map<String, dynamic>;
+      final verificationUrl = data['verificationUrl'] as String?;
+
+      // On stocke temporairement l'email pour l'écran de vérification,
+      // mais on ne connecte PAS l'utilisateur (pas de tokens).
+      state = const AuthState().copyWith(
+        isLoading: false,
         email: user['email'] as String?,
-        mustChangePassword: user['mustChangePassword'] as bool? ?? false,
+        error: null,
       );
-      return true;
+      return verificationUrl ?? ''; // '' = email envoyé, non null = mode stub
     } on ApiException catch (e) {
       if (e.code == 'NETWORK_ERROR') {
         state = state.copyWith(
           isLoading: false,
           error: 'Backend injoignable — impossible de créer un compte en mode démo.',
         );
-        return false;
+        return null;
       }
       state = state.copyWith(isLoading: false, error: e.message);
-      return false;
+      return null;
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
         error: 'Erreur lors de la création du compte.',
       );
-      return false;
+      return null;
+    }
+  }
+
+  /// Vérifier si l'email a été confirmé (appel /me après clic sur le lien).
+  Future<bool> checkEmailVerified() async {
+    try {
+      final user = await _repo.me();
+      if (user['emailVerified'] as bool? ?? false) {
+        await _persist(user);
+        state = AuthState(
+          role: _roleFromBackend(user['role'] as String?),
+          userId: user['id'] as String?,
+          userName: user['name'] as String?,
+          badgeNumber: user['badgeNumber'] as String?,
+          telephone: user['telephone'] as String?,
+          email: user['email'] as String?,
+          mustChangePassword: user['mustChangePassword'] as bool? ?? false,
+          emailVerified: true,
+        );
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Renvoyer l'email de vérification.
+  Future<String?> resendVerification(String email) async {
+    try {
+      final data = await _repo.resendVerification(email);
+      return data['verificationUrl'] as String?;
+    } catch (_) {
+      return null;
     }
   }
 

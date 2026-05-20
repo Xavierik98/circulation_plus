@@ -29,6 +29,7 @@ import '../features/admin/presentation/map_screen.dart';
 import '../features/admin/presentation/officers_management_screen.dart';
 import '../features/admin/presentation/revenue_dashboard.dart';
 import '../features/auth/presentation/change_password_screen.dart';
+import '../features/auth/presentation/verify_email_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -49,7 +50,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isPublicRoute = location.startsWith('/splash') ||
           location.startsWith('/role') ||
           location.startsWith('/login') ||
-          location.startsWith('/register');
+          location.startsWith('/register') ||
+          location.startsWith('/verify-email');
       final isChangePassword = location.startsWith('/change-password');
 
       if (!isAuth && !isPublicRoute && !isChangePassword) return '/role';
@@ -57,6 +59,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Changement de mot de passe obligatoire : bloquer tout accès au dashboard.
       if (isAuth && authState.mustChangePassword && !isChangePassword) {
         return '/change-password?mandatory=true';
+      }
+
+      // Email non vérifié (CITOYEN connecté mais pas encore validé) :
+      // bloquer l'accès au dashboard.
+      if (isAuth &&
+          authState.role == UserRole.citizen &&
+          !authState.emailVerified &&
+          !location.startsWith('/verify-email') &&
+          !isChangePassword) {
+        return '/verify-email';
       }
 
       if (isAuth && isPublicRoute && !location.startsWith('/splash')) {
@@ -91,6 +103,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ChangePasswordScreen(
           mandatory: state.uri.queryParameters['mandatory'] == 'true',
         ),
+      ),
+      GoRoute(
+        path: '/verify-email',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return VerifyEmailScreen(
+            email: extra?['email'] as String? ?? state.uri.queryParameters['email'],
+            devVerificationUrl: extra?['devUrl'] as String?,
+          );
+        },
       ),
 
       // Police Shell

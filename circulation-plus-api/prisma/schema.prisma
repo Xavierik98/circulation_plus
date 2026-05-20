@@ -45,6 +45,8 @@ model User {
   telephone   String?
   actif                Boolean  @default(true)
   mustChangePassword   Boolean  @default(false) // Force le changement au 1er login
+  emailVerified        Boolean  @default(true)  // false pour les nouveaux citoyens jusqu'à validation
+  emailVerificationToken String? @unique        // Jeton de validation email (CITOYEN uniquement)
   // Token Firebase Cloud Messaging du terminal de l'agent (ajout : le spec exige
   // un push FCM mais ne stocke aucun token ; la Notification reste le canal durable).
   fcmToken    String?

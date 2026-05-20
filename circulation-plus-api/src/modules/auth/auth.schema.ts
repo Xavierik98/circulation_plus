@@ -58,6 +58,11 @@ export const changePasswordSchema = z.object({
 });
 export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
 
+export const resendVerificationSchema = z.object({
+  email: z.string().email(),
+});
+export type ResendVerificationBody = z.infer<typeof resendVerificationSchema>;
+
 export const loginResponseSchema = z.object({
   success: z.literal(true),
   data: z.object({

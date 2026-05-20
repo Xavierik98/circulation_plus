@@ -120,13 +120,15 @@ const INFRACTIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const pinHash = await bcrypt.hash('0000', PIN_ROUNDS);
+  // Mot de passe démo : respecte la politique ISO 27001 (min 10 car., maj, min, chiffre, spécial)
+  const DEMO_PIN = 'Demo@1234!';
+  const pinHash  = await bcrypt.hash(DEMO_PIN, PIN_ROUNDS);
 
   // ── Comptes ──
   await prisma.user.upsert({
-    where: { email: 'admin@pnc.cg' },
-    update: {},
-    create: { email: 'admin@pnc.cg', pinHash, role: 'ADMIN', name: 'Administrateur PNC' },
+    where:  { email: 'admin@pnc.cg' },
+    update: { pinHash, emailVerified: true },
+    create: { email: 'admin@pnc.cg', pinHash, role: 'ADMIN', name: 'Administrateur PNC', emailVerified: true },
   });
 
   const agents = [
@@ -136,23 +138,26 @@ async function main(): Promise<void> {
   ];
   for (const a of agents) {
     await prisma.user.upsert({
-      where: { email: a.email },
-      update: {},
-      create: { ...a, pinHash, role: 'POLICE' },
+      where:  { email: a.email },
+      update: { pinHash, emailVerified: true },
+      create: { ...a, pinHash, role: 'POLICE', emailVerified: true },
     });
   }
 
   const citoyens = [
-    { email: 'citoyen1@pnc.cg', name: 'Marie Samba',   telephone: '+242061111111' },
-    { email: 'citoyen2@pnc.cg', name: 'Thomas Ngolo',  telephone: '+242062222222' },
+    { email: 'citoyen1@pnc.cg', name: 'Marie Samba',  telephone: '+242061111111' },
+    { email: 'citoyen2@pnc.cg', name: 'Thomas Ngolo', telephone: '+242062222222' },
   ];
   for (const c of citoyens) {
     await prisma.user.upsert({
-      where: { email: c.email },
-      update: {},
-      create: { ...c, pinHash, role: 'CITOYEN' },
+      where:  { email: c.email },
+      update: { pinHash, emailVerified: true },
+      create: { ...c, pinHash, role: 'CITOYEN', emailVerified: true },
     });
   }
+
+  // eslint-disable-next-line no-console
+  console.log(`   Mot de passe démo : ${DEMO_PIN}`);
 
   // ── Catalogue d'infractions officiel (code de la route Congo) ──
   let upserted = 0;

@@ -48,6 +48,9 @@ class AuthRepository {
     await _api.clearTokens();
   }
 
+  /// Inscription citoyen.
+  /// Retourne `{ user: {...}, verificationUrl?: '...' }`.
+  /// Note : plus de token — l'accès est conditionné à la vérification email.
   Future<Map<String, dynamic>> register(
     String name,
     String email,
@@ -63,12 +66,14 @@ class AuthRepository {
         'pin': pin,
       },
     ) as Map<String, dynamic>;
-    await _api.saveTokens(
-      data['token'] as String,
-      data['refreshToken'] as String,
-    );
-    return data['user'] as Map<String, dynamic>;
+    // Pas de saveTokens — on attend la vérification email
+    return data; // { user: {...}, verificationUrl?: '...' }
   }
+
+  /// Renvoie le mail de vérification.
+  Future<Map<String, dynamic>> resendVerification(String email) async =>
+      await _api.post('/api/auth/resend-verification',
+          body: {'email': email}) as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> changePassword(
     String currentPassword,

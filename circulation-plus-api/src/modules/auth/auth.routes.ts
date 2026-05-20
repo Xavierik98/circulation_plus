@@ -9,8 +9,44 @@ import {
   logoutBodySchema,
   registerBodySchema,
   changePasswordSchema,
+  resendVerificationSchema,
 } from './auth.schema';
-import { login, refresh, logout, getMe, register, changePassword } from './auth.service';
+import { login, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification } from './auth.service';
+
+// ── Page HTML retournée après clic sur le lien de vérification ────────────────
+function verifyHtml(success: boolean): string {
+  const icon    = success ? '✅' : '❌';
+  const title   = success ? 'Email vérifié !' : 'Lien invalide';
+  const message = success
+    ? 'Votre compte Circulation+ est maintenant actif. Retournez dans l\'application pour vous connecter.'
+    : 'Ce lien est invalide ou a déjà été utilisé. Demandez un nouveau lien depuis l\'application.';
+  const color   = success ? '#22c55e' : '#ef4444';
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Circulation+ — ${title}</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{background:#1e293b;border-radius:16px;padding:40px 32px;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+    .icon{font-size:64px;margin-bottom:16px}
+    h1{font-size:22px;color:${color};margin:0 0 12px}
+    p{font-size:14px;color:#94a3b8;line-height:1.6;margin:0}
+    .brand{font-size:13px;color:#475569;margin-top:28px;padding-top:20px;border-top:1px solid #334155}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">${icon}</div>
+    <h1>${title}</h1>
+    <p>${message}</p>
+    <div class="brand">🇨🇬 Circulation+ · Police Nationale Congolaise</div>
+  </div>
+</body>
+</html>`;
+}
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -23,13 +59,52 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ['Auth'],
         summary: 'Inscription citoyen (auto-inscription publique)',
-        description: 'Crée un compte CITOYEN. Codes : EMAIL_ALREADY_USED (409).',
+        description:
+          'Crée un compte CITOYEN avec emailVerified=false. '
+          + 'Un email de vérification est envoyé. '
+          + 'En mode développement (pas de SMTP), verificationUrl est inclus dans la réponse. '
+          + 'Codes : EMAIL_ALREADY_USED (409).',
         body: registerBodySchema,
       },
     },
     async (request) => {
       const { name, email, telephone, pin } = request.body;
       const result = await register(name, email, telephone, pin, request.ip);
+      return ok(result);
+    },
+  );
+
+  // GET /api/auth/verify-email — PUBLIC (lien cliqué depuis l'email).
+  app.get(
+    '/verify-email',
+    async (request, reply) => {
+      const { token } = request.query as { token?: string };
+      if (!token) {
+        return reply.type('text/html').send(verifyHtml(false));
+      }
+      try {
+        await verifyEmail(token);
+        return reply.type('text/html').send(verifyHtml(true));
+      } catch {
+        return reply.type('text/html').send(verifyHtml(false));
+      }
+    },
+  );
+
+  // POST /api/auth/resend-verification — PUBLIC.
+  r.post(
+    '/resend-verification',
+    {
+      config: { rateLimit: LOGIN_RATE_LIMIT },
+      schema: {
+        tags: ['Auth'],
+        summary: 'Renvoyer l\'email de vérification',
+        description: 'PUBLIC. Aucune erreur si le compte n\'existe pas (anti-enumeration).',
+        body: resendVerificationSchema,
+      },
+    },
+    async (request) => {
+      const result = await resendVerification(request.body.email, request.ip);
       return ok(result);
     },
   );

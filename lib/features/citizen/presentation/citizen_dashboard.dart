@@ -7,6 +7,7 @@ import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../data/providers.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class CitizenDashboard extends ConsumerWidget {
   const CitizenDashboard({super.key});
@@ -14,12 +15,14 @@ class CitizenDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final finesAsync = ref.watch(myFinesProvider);
+    final auth = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: () async {
-          await ref.refresh(myFinesProvider.future);
+          // ignore: unused_result
+          ref.refresh(myFinesProvider);
         },
         child: finesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -48,13 +51,13 @@ class CitizenDashboard extends ConsumerWidget {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       const SizedBox(height: 16),
-                      _buildProfileBanner(totalDebt, pending.length),
+                      _buildProfileBanner(auth, totalDebt, pending.length),
                       const SizedBox(height: 24),
                       _buildActiveFines(context, pending),
                       const SizedBox(height: 24),
                       _buildPaidHistory(context, fines),
                       const SizedBox(height: 24),
-                      _buildAlerts(),
+                      _buildAlerts(fines),
                       const SizedBox(height: 100),
                     ]),
                   ),
@@ -138,7 +141,12 @@ class CitizenDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileBanner(int totalDebt, int pendingCount) {
+  Widget _buildProfileBanner(AuthState auth, int totalDebt, int pendingCount) {
+    final name = auth.userName ?? 'Citoyen';
+    final phone = auth.telephone ?? '';
+    final email = auth.email ?? '';
+    final initials = auth.initials;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -171,9 +179,9 @@ class CitizenDashboard extends ConsumerWidget {
                       : AppColors.successGradient,
                   shape: BoxShape.circle,
                 ),
-                child: const Center(
-                  child: Text('TN',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+                child: Center(
+                  child: Text(initials,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
                 ),
               ),
               const SizedBox(width: 14),
@@ -181,9 +189,11 @@ class CitizenDashboard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Thierry Nguesso', style: AppTextStyles.titleMedium),
-                    Text('+242 06 789 0123', style: AppTextStyles.bodySmall),
-                    Text('CG-1988-047821', style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+                    Text(name, style: AppTextStyles.titleMedium),
+                    if (phone.isNotEmpty)
+                      Text(phone, style: AppTextStyles.bodySmall),
+                    if (email.isNotEmpty)
+                      Text(email, style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
                   ],
                 ),
               ),
@@ -302,7 +312,10 @@ class CitizenDashboard extends ConsumerWidget {
     ).animate().fadeIn(delay: 300.ms);
   }
 
-  Widget _buildAlerts() {
+  Widget _buildAlerts(List<FineModel> fines) {
+    final overdue = fines.where((f) => f.status == FineStatus.overdue).toList();
+    if (overdue.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -310,26 +323,22 @@ class CitizenDashboard extends ConsumerWidget {
           children: [
             Container(
               width: 4, height: 18,
-              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(width: 10),
             Text('Alertes & rappels', style: AppTextStyles.titleMedium),
           ],
         ),
         const SizedBox(height: 12),
-        const _AlertCard(
-          icon: Icons.credit_card_off_outlined,
-          title: 'Renouvellement permis',
-          body: 'Votre permis expire dans ~30 jours. Rendez-vous à la Préfecture.',
-          color: AppColors.warning,
-        ),
-        const SizedBox(height: 8),
-        const _AlertCard(
-          icon: Icons.gavel_rounded,
-          title: 'Amende en retard',
-          body: 'L\'amende CP-2024-000892 est en retard de 45 jours. Pénalité +50%.',
-          color: AppColors.error,
-        ),
+        ...overdue.map((f) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _AlertCard(
+            icon: Icons.gavel_rounded,
+            title: 'Amende en retard',
+            body: 'Le PV ${f.reference} est en retard. Pénalité +50% applicable.',
+            color: AppColors.error,
+          ),
+        )),
       ],
     ).animate().fadeIn(delay: 400.ms);
   }

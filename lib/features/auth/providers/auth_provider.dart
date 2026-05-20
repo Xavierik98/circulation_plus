@@ -35,6 +35,8 @@ class AuthState {
   final String? userId;
   final String? userName;
   final String? badgeNumber;
+  final String? telephone;
+  final String? email;
   final bool isLoading;
   final String? error;
 
@@ -43,17 +45,29 @@ class AuthState {
     this.userId,
     this.userName,
     this.badgeNumber,
+    this.telephone,
+    this.email,
     this.isLoading = false,
     this.error,
   });
 
   bool get isAuthenticated => role != UserRole.none;
 
+  /// Initiales à partir du nom complet (ex: "Marie Samba" → "MS")
+  String get initials {
+    if (userName == null || userName!.trim().isEmpty) return '?';
+    final parts = userName!.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+  }
+
   AuthState copyWith({
     UserRole? role,
     String? userId,
     String? userName,
     String? badgeNumber,
+    String? telephone,
+    String? email,
     bool? isLoading,
     String? error,
   }) {
@@ -62,6 +76,8 @@ class AuthState {
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,
       badgeNumber: badgeNumber ?? this.badgeNumber,
+      telephone: telephone ?? this.telephone,
+      email: email ?? this.email,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -85,6 +101,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userId: user['id'] as String?,
         userName: user['name'] as String?,
         badgeNumber: user['badgeNumber'] as String?,
+        telephone: user['telephone'] as String?,
+        email: user['email'] as String?,
       );
     } catch (_) {
       // Session invalide : on reste déconnecté.
@@ -97,10 +115,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final role = _roleFromBackend(user['role'] as String?);
     await prefs.setString(AppConstants.prefUserRole, role.name);
     await prefs.setString(AppConstants.prefUserId, user['id'] as String? ?? '');
-    await prefs.setString(
-        AppConstants.prefUserName, user['name'] as String? ?? '');
-    await prefs.setString(
-        AppConstants.prefUserBadge, user['badgeNumber'] as String? ?? '');
+    await prefs.setString(AppConstants.prefUserName, user['name'] as String? ?? '');
+    await prefs.setString(AppConstants.prefUserBadge, user['badgeNumber'] as String? ?? '');
+    await prefs.setString(AppConstants.prefUserPhone, user['telephone'] as String? ?? '');
+    await prefs.setString(AppConstants.prefUserEmail, user['email'] as String? ?? '');
   }
 
   Future<bool> login({
@@ -118,6 +136,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userId: user['id'] as String?,
         userName: user['name'] as String?,
         badgeNumber: user['badgeNumber'] as String?,
+        telephone: user['telephone'] as String?,
+        email: user['email'] as String?,
       );
       return true;
     } on ApiException catch (e) {
@@ -179,6 +199,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userId: user['id'] as String?,
         userName: user['name'] as String?,
         badgeNumber: user['badgeNumber'] as String?,
+        telephone: user['telephone'] as String?,
+        email: user['email'] as String?,
       );
       return true;
     } on ApiException catch (e) {

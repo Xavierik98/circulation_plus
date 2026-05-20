@@ -21,6 +21,8 @@ class AppConstants {
   static const String prefUserId = 'user_id';
   static const String prefUserName = 'user_name';
   static const String prefUserBadge = 'user_badge';
+  static const String prefUserPhone = 'user_phone';
+  static const String prefUserEmail = 'user_email';
   static const String prefDarkMode = 'dark_mode';
   static const String prefOnboarded = 'onboarded';
 

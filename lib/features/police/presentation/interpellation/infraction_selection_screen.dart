@@ -8,7 +8,7 @@ import '../../../../shared/models/infraction_model.dart';
 import '../../../../shared/widgets/premium_button.dart';
 import '../../../../data/providers.dart';
 
-final _selectedInfractionsProvider = StateProvider<List<InfractionType>>((ref) => []);
+// Provider déplacé dans data/providers.dart (selectedInfractionsProvider).
 
 class InfractionSelectionScreen extends ConsumerStatefulWidget {
   const InfractionSelectionScreen({super.key});
@@ -28,7 +28,7 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
 
   @override
   Widget build(BuildContext context) {
-    final selected = ref.watch(_selectedInfractionsProvider);
+    final selected = ref.watch(selectedInfractionsProvider);
     final totalAmount = selected.fold<int>(0, (sum, i) => sum + i.fineAmount);
 
     return Scaffold(
@@ -98,7 +98,7 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
                           isSelected: isSelected,
                           onToggle: () {
                             ref
-                                .read(_selectedInfractionsProvider.notifier)
+                                .read(selectedInfractionsProvider.notifier)
                                 .update((current) {
                               final newList =
                                   List<InfractionType>.from(current);

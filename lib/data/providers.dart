@@ -55,3 +55,8 @@ final revenueStatsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   return ref.read(statsRepositoryProvider).revenue();
 });
+
+/// Infractions sélectionnées pendant le flux d'interpellation.
+/// Partagé entre InfractionSelectionScreen → FineCalculationScreen.
+final selectedInfractionsProvider =
+    StateProvider<List<InfractionType>>((ref) => []);

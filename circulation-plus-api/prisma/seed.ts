@@ -159,6 +159,20 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`   Mot de passe démo : ${DEMO_PIN}`);
 
+  // ── Compte citoyen de test (email déjà vérifié, prêt à l'emploi) ──
+  await prisma.user.upsert({
+    where:  { email: 'test.citoyen@gmail.com' },
+    update: { pinHash, emailVerified: true, emailVerificationToken: null },
+    create: {
+      email: 'test.citoyen@gmail.com',
+      name:  'Paul Ondongo',
+      telephone: '+242061234567',
+      pinHash,
+      role: 'CITOYEN',
+      emailVerified: true,
+    },
+  });
+
   // ── Catalogue d'infractions officiel (code de la route Congo) ──
   let upserted = 0;
   for (const inf of INFRACTIONS) {

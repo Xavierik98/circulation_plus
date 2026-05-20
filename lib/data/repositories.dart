@@ -49,8 +49,8 @@ class AuthRepository {
   }
 
   /// Inscription citoyen.
-  /// Retourne `{ user: {...}, verificationUrl?: '...' }`.
-  /// Note : plus de token — l'accès est conditionné à la vérification email.
+  /// Retourne `{ user: {...}, verificationUrl?: '...', token, refreshToken }`.
+  /// Un token est émis immédiatement (accès bloqué par emailVerified=false côté router).
   Future<Map<String, dynamic>> register(
     String name,
     String email,
@@ -66,7 +66,11 @@ class AuthRepository {
         'pin': pin,
       },
     ) as Map<String, dynamic>;
-    // Pas de saveTokens — on attend la vérification email
+    // Sauvegarder les tokens pour pouvoir appeler /me après vérification
+    await _api.saveTokens(
+      data['token'] as String,
+      data['refreshToken'] as String,
+    );
     return data; // { user: {...}, verificationUrl?: '...' }
   }
 

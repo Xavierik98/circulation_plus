@@ -210,12 +210,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = data['user'] as Map<String, dynamic>;
       final verificationUrl = data['verificationUrl'] as String?;
 
-      // On stocke temporairement l'email pour l'écran de vérification,
-      // mais on ne connecte PAS l'utilisateur (pas de tokens).
-      state = const AuthState().copyWith(
-        isLoading: false,
+      // Authentifier l'utilisateur (le router bloquera l'accès via emailVerified=false)
+      await _persist(user);
+      state = AuthState(
+        role: _roleFromBackend(user['role'] as String?),
+        userId: user['id'] as String?,
+        userName: user['name'] as String?,
+        badgeNumber: user['badgeNumber'] as String?,
+        telephone: user['telephone'] as String?,
         email: user['email'] as String?,
-        error: null,
+        mustChangePassword: user['mustChangePassword'] as bool? ?? false,
+        emailVerified: false, // Toujours false à l'inscription
       );
       return verificationUrl ?? ''; // '' = email envoyé, non null = mode stub
     } on ApiException catch (e) {

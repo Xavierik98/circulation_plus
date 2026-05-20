@@ -197,6 +197,8 @@ export async function register(
   pin: string,
   ip: string | null,
 ): Promise<{
+  token: string;
+  refreshToken: string;
   user: ReturnType<typeof publicUser>;
   // En mode stub (pas de SMTP), le lien de vérification est retourné en clair
   // pour faciliter les tests. En production ce champ est absent.
@@ -230,6 +232,10 @@ export async function register(
     console.error('[email] Échec envoi vérification :', err);
   });
 
+  // Émettre les tokens JWT (l'accès au dashboard est bloqué par emailVerified=false)
+  const token = signAccessToken(user);
+  const refreshToken = await issueRefreshToken(user.id);
+
   await audit(prisma, { userId: user.id, action: 'REGISTER', ip });
 
   // En mode développement (pas de SMTP), inclure le lien dans la réponse API
@@ -238,7 +244,7 @@ export async function register(
     ? `${env.BASE_URL}/api/auth/verify-email?token=${emailVerificationToken}`
     : undefined;
 
-  return { user: publicUser(user), verificationUrl };
+  return { token, refreshToken, user: publicUser(user), verificationUrl };
 }
 
 // Vérification de l'email via token

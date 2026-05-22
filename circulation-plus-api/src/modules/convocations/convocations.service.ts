@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import type { Adapters } from '../../adapters/types';
 import { env } from '../../config/env';
 import { smsTemplates } from '../../shared/utils/sms';
+import { notify } from '../../shared/utils/fcm';
 
 const LIEU_CONVOCATION = 'Commissariat central de Brazzaville';
 
@@ -103,4 +104,62 @@ export async function flagOverdueFines(prisma: PrismaClient): Promise<void> {
     where: { status: 'PENDING', dateEcheance: { lt: new Date() } },
     data: { status: 'OVERDUE' },
   });
+}
+
+// Envoie un rappel SMS + notification in-app pour les amendes PENDING
+// dont l'échéance est dans la fenêtre [23h, 25h] à partir de maintenant.
+// Lancé toutes les heures → chaque amende reçoit exactement un rappel ~24h avant.
+export async function sendOverdueReminders(
+  prisma: PrismaClient,
+  adapters: Adapters,
+): Promise<void> {
+  const now = Date.now();
+  const in23h = new Date(now + 23 * 3600 * 1000);
+  const in25h = new Date(now + 25 * 3600 * 1000);
+
+  const fines = await prisma.fine.findMany({
+    where: {
+      status: 'PENDING',
+      dateEcheance: { gte: in23h, lte: in25h },
+    },
+    include: {
+      driver: true,
+      citizen: true,
+    },
+  });
+
+  for (const fine of fines) {
+    // SMS au conducteur ou au citoyen lié
+    const phone = fine.driver?.telephone ?? fine.citizen?.telephone ?? null;
+    if (phone) {
+      try {
+        await adapters.sms.send(
+          phone,
+          smsTemplates.rappelEcheance({
+            ref: fine.reference,
+            montant: fine.montantTotal,
+            echeance: fine.dateEcheance,
+          }),
+        );
+      } catch {
+        /* SMS non bloquant */
+      }
+    }
+
+    // Notification in-app pour le compte citoyen lié
+    if (fine.citizenId && fine.citizen) {
+      try {
+        await notify(prisma, adapters.push, {
+          userId: fine.citizenId,
+          fcmToken: fine.citizen.fcmToken ?? null,
+          title: '⚠️ Amende à régler avant demain',
+          body: `Votre amende ${fine.reference} (${fine.montantTotal} XAF) expire dans moins de 24h. Payez maintenant.`,
+          type: 'fine_due',
+          data: { fineId: fine.id, reference: fine.reference },
+        });
+      } catch {
+        /* notification non bloquante */
+      }
+    }
+  }
 }

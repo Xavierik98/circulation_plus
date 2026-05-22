@@ -5,6 +5,7 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../shared/errors/AppError';
 import { audit } from '../../shared/middleware/audit';
 import { revokeAllRefreshTokens } from '../auth/auth.service';
+import { sendCredentialsEmail } from '../../config/email';
 import type { CreateOfficerBody, UpdateOfficerBody } from './officers.schema';
 
 const PIN_ROUNDS = 12;
@@ -135,6 +136,19 @@ export async function createOfficer(body: CreateOfficerBody, actorId: string) {
     action: 'OFFICER_CREATED',
     details: { officerId: officer.id, badgeNumber: officer.badgeNumber },
   });
+
+  // Envoi des identifiants par email (non bloquant).
+  try {
+    await sendCredentialsEmail(
+      officer.email,
+      officer.name,
+      officer.email,
+      body.pin, // mot de passe en clair avant le hash
+      officer.badgeNumber ?? '—',
+    );
+  } catch (err) {
+    console.warn('[email] Échec envoi identifiants agent :', (err as Error).message);
+  }
 
   return {
     id: officer.id,

@@ -16,9 +16,12 @@ const PASSWORD_POLICY = z
   );
 
 // Le frontend envoie le rôle en minuscule ("police" | "citizen" | "admin").
+// ⚠️  Pas de PASSWORD_POLICY ici : la vérification du mot de passe est faite
+// par bcrypt. Appliquer la politique à la connexion bloquerait les anciens
+// mots de passe et les mots de passe générés légitimes.
 export const loginBodySchema = z.object({
   email: z.string().email(),
-  pin:   PASSWORD_POLICY,
+  pin:   z.string().min(1, 'Mot de passe requis'),
   role:  z.enum(['police', 'citizen', 'admin']),
 });
 export type LoginBody = z.infer<typeof loginBodySchema>;

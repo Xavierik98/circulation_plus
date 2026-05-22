@@ -7,8 +7,7 @@ import '../../../../theme/app_text_styles.dart';
 import '../../../../shared/models/infraction_model.dart';
 import '../../../../shared/widgets/premium_button.dart';
 import '../../../../data/providers.dart';
-
-// Provider déplacé dans data/providers.dart (selectedInfractionsProvider).
+import '../../../../shared/models/interpellation_state.dart';
 
 class InfractionSelectionScreen extends ConsumerStatefulWidget {
   const InfractionSelectionScreen({super.key});
@@ -50,13 +49,13 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Sélection des infractions', style: AppTextStyles.titleSmall),
-            Text('Étape 3 sur 5', style: AppTextStyles.caption),
+            Text('Étape 4 sur 6', style: AppTextStyles.caption),
           ],
         ),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(4),
           child: LinearProgressIndicator(
-            value: 0.6,
+            value: 0.67,
             backgroundColor: AppColors.surfaceVariant,
             color: AppColors.primary,
             minHeight: 3,
@@ -97,18 +96,18 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
                           infraction: inf,
                           isSelected: isSelected,
                           onToggle: () {
-                            ref
-                                .read(selectedInfractionsProvider.notifier)
-                                .update((current) {
-                              final newList =
-                                  List<InfractionType>.from(current);
-                              if (isSelected) {
-                                newList.removeWhere((s) => s.id == inf.id);
-                              } else {
-                                newList.add(inf);
-                              }
-                              return newList;
-                            });
+                            final current = List<InfractionType>.from(
+                                ref.read(selectedInfractionsProvider));
+                            if (isSelected) {
+                              current.removeWhere((s) => s.id == inf.id);
+                            } else {
+                              current.add(inf);
+                            }
+                            // Mise à jour des deux providers simultanément
+                            ref.read(selectedInfractionsProvider.notifier)
+                                .state = current;
+                            ref.read(interpellationProvider.notifier)
+                                .setInfractions(current);
                           },
                         )
                             .animate(delay: Duration(milliseconds: index * 50))
@@ -183,6 +182,13 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
     );
   }
 
+  String _fmtAmount(int amount) {
+    if (amount < 1000) return amount.toString();
+    final t = amount ~/ 1000;
+    final r = amount % 1000;
+    return r == 0 ? '$t 000' : '$t ${r.toString().padLeft(3, '0')}';
+  }
+
   Widget _buildBottomBar(List<InfractionType> selected, int total) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -204,7 +210,7 @@ class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionS
                     style: AppTextStyles.bodySmall,
                   ),
                   Text(
-                    '${(total / 1000).toStringAsFixed(0)} 000 FCFA',
+                    '${_fmtAmount(total)} FCFA',
                     style: AppTextStyles.titleMedium.copyWith(color: AppColors.primary),
                   ),
                 ],

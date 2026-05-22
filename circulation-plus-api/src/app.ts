@@ -23,6 +23,8 @@ import { paymentsRoutes } from './modules/payments/payments.routes';
 import { driversRoutes } from './modules/drivers/drivers.routes';
 import { vehiclesRoutes } from './modules/vehicles/vehicles.routes';
 import { officersRoutes } from './modules/officers/officers.routes';
+import { statusRoutes } from './modules/officers/status.routes';
+import { sanctionsRoutes } from './modules/sanctions/sanctions.routes';
 import { notificationsRoutes } from './modules/notifications/notifications.routes';
 import { statsRoutes } from './modules/stats/stats.routes';
 import { registerStubRoutes } from './modules/payments/stub.routes';
@@ -147,6 +149,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(driversRoutes, { prefix: '/api/drivers' });
   await app.register(vehiclesRoutes, { prefix: '/api/vehicles' });
   await app.register(officersRoutes, { prefix: '/api/officers' });
+  await app.register(statusRoutes, { prefix: '/api/officers' });
+  await app.register(sanctionsRoutes, { prefix: '/api/officers' });
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });
   await app.register(statsRoutes, { prefix: '/api/stats' });
 

@@ -150,13 +150,13 @@ class SettingsScreen extends ConsumerWidget {
               _ActionRow(
                 label: 'Politique de confidentialité',
                 icon: Icons.privacy_tip_outlined,
-                onTap: () {},
+                onTap: () => _showPrivacyPolicy(context),
               ),
               const Divider(height: 1, color: AppColors.divider, indent: 16),
               _ActionRow(
                 label: 'Conditions d\'utilisation',
                 icon: Icons.article_outlined,
-                onTap: () {},
+                onTap: () => _showTermsOfUse(context),
               ),
             ],
           ),
@@ -276,6 +276,172 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     ).animate().fadeIn(duration: 400.ms);
+  }
+
+  void _showPrivacyPolicy(BuildContext context) {
+    _showLegalSheet(
+      context,
+      title: 'Politique de confidentialité',
+      sections: const [
+        _LegalSection(
+          heading: 'Données collectées',
+          body:
+              'Nous collectons votre nom, adresse email, numéro de téléphone '
+              'et votre localisation lors de la constatation d\'infractions routières.',
+        ),
+        _LegalSection(
+          heading: 'Utilisation des données',
+          body:
+              'Vos données sont utilisées pour la gestion des contraventions '
+              'routières et la communication officielle avec la Police Nationale '
+              'Congolaise (PNC).',
+        ),
+        _LegalSection(
+          heading: 'Partage des données',
+          body:
+              'Vos informations sont partagées uniquement avec les autorités '
+              'judiciaires congolaises compétentes, dans le cadre strict des '
+              'procédures légales en vigueur.',
+        ),
+        _LegalSection(
+          heading: 'Durée de conservation',
+          body:
+              'Vos données sont conservées pendant 5 ans, conformément au '
+              'Code de la route de la République du Congo.',
+        ),
+        _LegalSection(
+          heading: 'Vos droits',
+          body:
+              'Vous disposez d\'un droit d\'accès, de rectification et de '
+              'suppression de vos données personnelles, exerceable directement '
+              'depuis l\'application.',
+        ),
+        _LegalSection(
+          heading: 'Contact',
+          body: 'Pour toute demande relative à vos données : dgst@pnc.cg',
+        ),
+      ],
+    );
+  }
+
+  void _showTermsOfUse(BuildContext context) {
+    _showLegalSheet(
+      context,
+      title: 'Conditions d\'utilisation',
+      sections: const [
+        _LegalSection(
+          heading: 'Accès à l\'application',
+          body:
+              'L\'application Circulation+ est réservée aux citoyens et agents '
+              'de la République du Congo. Toute utilisation en dehors de ce '
+              'cadre est interdite.',
+        ),
+        _LegalSection(
+          heading: 'Exactitude des informations',
+          body:
+              'Les informations fournies lors de votre inscription et au cours '
+              'de l\'utilisation de l\'application doivent être exactes et '
+              'à jour.',
+        ),
+        _LegalSection(
+          heading: 'Usage frauduleux',
+          body:
+              'Toute utilisation frauduleuse de l\'application, notamment la '
+              'falsification d\'informations ou l\'usurpation d\'identité, '
+              'est passible de sanctions pénales conformément à la législation '
+              'congolaise.',
+        ),
+        _LegalSection(
+          heading: 'Suspension de compte',
+          body:
+              'La Police Nationale Congolaise se réserve le droit de suspendre '
+              'ou de supprimer tout compte en cas de manquement aux présentes '
+              'conditions d\'utilisation.',
+        ),
+        _LegalSection(
+          heading: 'Droit applicable',
+          body:
+              'Les présentes conditions sont régies par le droit congolais. '
+              'Tout litige relève de la compétence exclusive du Tribunal de '
+              'Brazzaville.',
+        ),
+      ],
+    );
+  }
+
+  void _showLegalSheet(
+    BuildContext context, {
+    required String title,
+    required List<_LegalSection> sections,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollCtrl) => Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textDisabled,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(title, style: AppTextStyles.titleMedium),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            color: AppColors.textSecondary),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: AppColors.divider),
+                // Content
+                Expanded(
+                  child: ListView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                    children: [
+                      for (final s in sections) ...[
+                        Text(s.heading,
+                            style: AppTextStyles.titleSmall
+                                .copyWith(color: AppColors.primary)),
+                        const SizedBox(height: 6),
+                        Text(s.body,
+                            style: AppTextStyles.bodyMedium
+                                .copyWith(color: AppColors.textSecondary, height: 1.6)),
+                        const SizedBox(height: 20),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildSection({
@@ -428,6 +594,12 @@ class _InfoRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LegalSection {
+  final String heading;
+  final String body;
+  const _LegalSection({required this.heading, required this.body});
 }
 
 class _ActionRow extends StatelessWidget {

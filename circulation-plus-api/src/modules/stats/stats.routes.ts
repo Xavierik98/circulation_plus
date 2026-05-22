@@ -4,7 +4,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ok } from '../../shared/utils/response';
 import { authenticate } from '../../shared/middleware/authenticate';
 import { authorize } from '../../shared/middleware/authorize';
-import { getRevenueStats, getHeatmap } from './stats.service';
+import { getRevenueStats, getHeatmap, getOfficerStats } from './stats.service';
 
 const revenueQuerySchema = z.object({
   dateFrom: z.string().datetime().optional(),
@@ -14,6 +14,21 @@ const revenueQuerySchema = z.object({
 // Module Stats — réservé au rôle ADMIN.
 export async function statsRoutes(app: FastifyInstance): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
+
+  // GET /api/stats/me — Agent authentifié, ses propres statistiques.
+  r.get(
+    '/me',
+    {
+      preHandler: [authenticate, authorize('POLICE')],
+      schema: {
+        tags: ['Statistiques'],
+        summary: 'Statistiques personnelles de l\'agent connecté',
+        description: 'Rôle autorisé : POLICE.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async (request) => ok(await getOfficerStats(request.user!.id)),
+  );
 
   r.get(
     '/revenue',

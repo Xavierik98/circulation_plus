@@ -37,10 +37,14 @@ class AuthState {
   final String? badgeNumber;
   final String? telephone;
   final String? email;
+  final String? photoUrl;
   final bool mustChangePassword;
   final bool emailVerified;
   final bool isLoading;
   final String? error;
+  /// URL de vérification email retournée par le backend en mode dev/stub.
+  /// Stockée ici pour survivre au redirect GoRouter.
+  final String? verificationUrl;
 
   const AuthState({
     this.role = UserRole.none,
@@ -49,10 +53,12 @@ class AuthState {
     this.badgeNumber,
     this.telephone,
     this.email,
+    this.photoUrl,
     this.mustChangePassword = false,
     this.emailVerified = true,
     this.isLoading = false,
     this.error,
+    this.verificationUrl,
   });
 
   bool get isAuthenticated => role != UserRole.none;
@@ -72,10 +78,12 @@ class AuthState {
     String? badgeNumber,
     String? telephone,
     String? email,
+    String? photoUrl,
     bool? mustChangePassword,
     bool? emailVerified,
     bool? isLoading,
     String? error,
+    String? verificationUrl,
   }) {
     return AuthState(
       role: role ?? this.role,
@@ -84,10 +92,12 @@ class AuthState {
       badgeNumber: badgeNumber ?? this.badgeNumber,
       telephone: telephone ?? this.telephone,
       email: email ?? this.email,
+      photoUrl: photoUrl ?? this.photoUrl,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       emailVerified: emailVerified ?? this.emailVerified,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      verificationUrl: verificationUrl ?? this.verificationUrl,
     );
   }
 }
@@ -111,6 +121,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         badgeNumber: user['badgeNumber'] as String?,
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
+        photoUrl: user['photoUrl'] as String?,
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
         emailVerified: user['emailVerified'] as bool? ?? true,
       );
@@ -148,6 +159,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         badgeNumber: user['badgeNumber'] as String?,
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
+        photoUrl: user['photoUrl'] as String?,
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
         emailVerified: user['emailVerified'] as bool? ?? true,
       );
@@ -210,8 +222,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = data['user'] as Map<String, dynamic>;
       final verificationUrl = data['verificationUrl'] as String?;
 
-      // Authentifier l'utilisateur (le router bloquera l'accès via emailVerified=false)
+      // Authentifier l'utilisateur
       await _persist(user);
+      final devUrl = verificationUrl ?? '';
+      final isVerified = user['emailVerified'] as bool? ?? false;
       state = AuthState(
         role: _roleFromBackend(user['role'] as String?),
         userId: user['id'] as String?,
@@ -220,9 +234,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         telephone: user['telephone'] as String?,
         email: user['email'] as String?,
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
-        emailVerified: false, // Toujours false à l'inscription
+        emailVerified: isVerified, // Vrai en dev (auto-vérifié), false en prod
+        verificationUrl: devUrl.isNotEmpty ? devUrl : null,
       );
-      return verificationUrl ?? ''; // '' = email envoyé, non null = mode stub
+      return devUrl; // '' = auto-vérifié (dev) ou SMTP ok, non-vide = lien direct stub
     } on ApiException catch (e) {
       if (e.code == 'NETWORK_ERROR') {
         state = state.copyWith(
@@ -297,6 +312,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         error: 'Erreur lors du changement de mot de passe.',
       );
+      return false;
+    }
+  }
+
+  /// Upload photo de profil (base64). Met à jour photoUrl dans l'état local.
+  Future<bool> uploadPhoto(String imageBase64, String mimeType) async {
+    try {
+      final data = await _repo.uploadPhoto(imageBase64, mimeType);
+      final url = data['photoUrl'] as String?;
+      if (url != null) {
+        state = state.copyWith(photoUrl: url);
+      }
+      return true;
+    } catch (_) {
       return false;
     }
   }

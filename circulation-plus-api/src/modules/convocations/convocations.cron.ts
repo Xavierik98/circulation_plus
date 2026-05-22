@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { ToadScheduler, SimpleIntervalJob, AsyncTask } from 'toad-scheduler';
 import { prisma } from '../../config/database';
-import { processConvocations, flagOverdueFines } from './convocations.service';
+import { processConvocations, flagOverdueFines, sendOverdueReminders } from './convocations.service';
 
 let scheduler: ToadScheduler | null = null;
 
@@ -14,6 +14,7 @@ export function startConvocationCron(app: FastifyInstance): void {
     async () => {
       await flagOverdueFines(prisma);
       await processConvocations(prisma, app.adapters);
+      await sendOverdueReminders(prisma, app.adapters);
     },
     (err: Error) => {
       app.log.error({ err }, 'Échec du traitement périodique des convocations');

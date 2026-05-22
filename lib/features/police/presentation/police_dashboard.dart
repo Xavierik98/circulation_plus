@@ -10,6 +10,22 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/animated_counter.dart';
 import '../../../shared/widgets/pnc_badge.dart';
+import '../../../data/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../../shared/widgets/user_avatar.dart';
+import '../../../data/providers.dart';
+
+String _firstName(String? fullName) {
+  if (fullName == null || fullName.trim().isEmpty) return 'Agent';
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  return parts.first;
+}
+
+String _lastName(String? fullName) {
+  if (fullName == null || fullName.trim().isEmpty) return '';
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  return parts.length > 1 ? parts.sublist(1).join(' ') : '';
+}
 
 class PoliceDashboard extends ConsumerStatefulWidget {
   const PoliceDashboard({super.key});
@@ -19,23 +35,90 @@ class PoliceDashboard extends ConsumerStatefulWidget {
 }
 
 class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
-  final OfficerModel officer = OfficerModel.currentOfficer;
+  bool _onDuty = false;
+  bool _statusLoading = false;
+
+  Future<void> _toggleDutyStatus() async {
+    final newStatus = !_onDuty;
+    setState(() => _statusLoading = true);
+    try {
+      await ApiClient.instance.post(
+        '/api/officers/me/status',
+        body: {
+          'onDuty': newStatus,
+          'lat': 0.0,
+          'lng': 0.0,
+        },
+      );
+      setState(() => _onDuty = newStatus);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newStatus ? 'Vous êtes maintenant en service' : 'Vous êtes hors service',
+            ),
+            backgroundColor: newStatus ? AppColors.success : AppColors.textTertiary,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la mise à jour du statut.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _statusLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+    final statsAsync = ref.watch(officerStatsProvider);
+
+    final stats = statsAsync.valueOrNull;
+    final officer = OfficerModel(
+      id: auth.userId ?? '',
+      badgeNumber: auth.badgeNumber ?? '—',
+      firstName: _firstName(auth.userName),
+      lastName: _lastName(auth.userName),
+      rank: 'Agent PNC',
+      unit: 'Police Nationale du Congo',
+      zone: '—',
+      phone: auth.telephone ?? '',
+      avatarInitials: auth.initials,
+      status: OfficerStatus.active,
+      totalInfractions: (stats?['totalInfractions'] as num?)?.toInt() ?? 0,
+      todayInfractions: (stats?['monthInfractions'] as num?)?.toInt() ?? 0,
+      totalRevenue: (stats?['totalRevenue'] as num?)?.toDouble() ?? 0.0,
+      joinedDate: DateTime.now(),
+    );
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          _buildAppBar(),
+          _buildAppBar(officer, _onDuty),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 const SizedBox(height: 16),
-                _buildWelcomeBanner(),
+                _buildWelcomeBanner(officer),
                 const SizedBox(height: 24),
-                _buildStatsRow(),
+                _buildStatsRow(officer, paymentRate: (stats?['paymentRate'] as num?)?.toInt()),
                 const SizedBox(height: 24),
                 _buildQuickActions(),
                 const SizedBox(height: 24),
@@ -51,7 +134,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildAppBar(OfficerModel officer, bool onDuty) {
     return SliverAppBar(
       pinned: true,
       floating: false,
@@ -79,6 +162,60 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
             ],
           ),
           const Spacer(),
+          // En service / Hors service toggle
+          GestureDetector(
+            onTap: _statusLoading ? null : _toggleDutyStatus,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: onDuty
+                    ? AppColors.success.withValues(alpha: 0.15)
+                    : AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: onDuty
+                      ? AppColors.success.withValues(alpha: 0.4)
+                      : AppColors.cardBorder,
+                ),
+              ),
+              child: _statusLoading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.success,
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: onDuty
+                                ? AppColors.success
+                                : AppColors.textDisabled,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          onDuty ? 'En service' : 'Hors service',
+                          style: AppTextStyles.caption.copyWith(
+                            color: onDuty
+                                ? AppColors.success
+                                : AppColors.textTertiary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(width: 8),
           StatusBadge.fromOfficerStatus(officer.status),
           const SizedBox(width: 8),
           GestureDetector(
@@ -122,7 +259,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     );
   }
 
-  Widget _buildWelcomeBanner() {
+  Widget _buildWelcomeBanner(OfficerModel officer) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Bonjour'
@@ -202,28 +339,11 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
           const SizedBox(width: 16),
           Column(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 16,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    officer.avatarInitials,
-                    style: AppTextStyles.titleLarge.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+              UserAvatar(
+                size: 64,
+                editable: true,
+                photoUrl: ref.watch(authProvider).photoUrl,
+                initials: officer.avatarInitials,
               ),
               const SizedBox(height: 8),
               Text(
@@ -242,7 +362,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2);
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(OfficerModel officer, {int? paymentRate}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -261,32 +381,30 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
               value: '${officer.totalInfractions}',
               icon: Icons.gavel_rounded,
               iconColor: AppColors.primary,
-              trend: '+12%',
               animationDelay: 0,
             ),
             StatCard(
               label: 'Revenus générés',
-              value: '${(officer.totalRevenue / 1000000).toStringAsFixed(1)}M',
+              value: officer.totalRevenue == 0
+                  ? '0'
+                  : '${(officer.totalRevenue / 1000000).toStringAsFixed(1)}M',
               subtitle: 'FCFA',
               icon: Icons.account_balance_wallet_outlined,
               iconColor: AppColors.success,
-              trend: '+8%',
               animationDelay: 100,
             ),
-            const StatCard(
+            StatCard(
               label: 'Ce mois',
-              value: '187',
+              value: '${officer.todayInfractions}',
               icon: Icons.calendar_month_outlined,
               iconColor: AppColors.warning,
-              trend: '+5%',
               animationDelay: 200,
             ),
-            const StatCard(
+            StatCard(
               label: 'Taux paiement',
-              value: '78%',
+              value: paymentRate == null ? '—' : '$paymentRate%',
               icon: Icons.check_circle_outline_rounded,
               iconColor: AppColors.success,
-              trend: '+3%',
               animationDelay: 300,
             ),
           ],
@@ -390,30 +508,6 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
   }
 
   Widget _buildActivityFeed() {
-    final activities = [
-      _ActivityItem(
-        time: '08:42',
-        label: 'Interpellation #1847',
-        detail: 'Excès de vitesse — BZV-4521-A',
-        amount: 30000,
-        isPositive: true,
-      ),
-      _ActivityItem(
-        time: '08:15',
-        label: 'Interpellation #1846',
-        detail: 'Téléphone au volant — PNR-1123-B',
-        amount: 20000,
-        isPositive: true,
-      ),
-      _ActivityItem(
-        time: '07:50',
-        label: 'Paiement reçu',
-        detail: 'Amende CP-2024-001523',
-        amount: 20000,
-        isPositive: false,
-      ),
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -432,58 +526,22 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
         ),
         const SizedBox(height: 12),
         PremiumCard(
-          padding: EdgeInsets.zero,
           child: Column(
-            children: activities
-                .asMap()
-                .entries
-                .map((entry) => Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: entry.value.isPositive
-                                      ? AppColors.primary
-                                      : AppColors.success,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(entry.value.label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary)),
-                                    Text(entry.value.detail, style: AppTextStyles.bodySmall),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${(entry.value.amount / 1000).toStringAsFixed(0)}K FCFA',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  Text(entry.value.time, style: AppTextStyles.caption),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (entry.key < activities.length - 1)
-                          const Divider(height: 1, color: AppColors.divider, indent: 36),
-                      ],
-                    ))
-                .toList(),
+            children: [
+              const Icon(Icons.history_rounded,
+                  size: 36, color: AppColors.textDisabled),
+              const SizedBox(height: 10),
+              Text(
+                'Aucune activité pour le moment',
+                style: AppTextStyles.bodyMedium
+                    .copyWith(color: AppColors.textTertiary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Vos verbalisations apparaîtront ici.',
+                style: AppTextStyles.bodySmall,
+              ),
+            ],
           ),
         ).animate().fadeIn(delay: 400.ms),
       ],
@@ -513,21 +571,6 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
       ],
     );
   }
-}
-
-class _ActivityItem {
-  final String time;
-  final String label;
-  final String detail;
-  final int amount;
-  final bool isPositive;
-  _ActivityItem({
-    required this.time,
-    required this.label,
-    required this.detail,
-    required this.amount,
-    required this.isPositive,
-  });
 }
 
 class _QuickActionCard extends StatelessWidget {

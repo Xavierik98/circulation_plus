@@ -1,4 +1,4 @@
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import type { Role, User } from '@prisma/client';
@@ -7,7 +7,7 @@ import { redis } from '../../config/redis';
 import { env } from '../../config/env';
 import { AppError } from '../../shared/errors/AppError';
 import { audit } from '../../shared/middleware/audit';
-import { sendVerificationEmail } from '../../config/email';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../../config/email';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 jours
@@ -37,6 +37,41 @@ function refreshKey(userId: string, jti: string): string {
   return `refresh:${userId}:${jti}`;
 }
 
+// ── Token de vérification email (JWT signé, valable 24 h — norme OWASP) ──────
+const EMAIL_VERIFY_TTL = '24h';
+
+function signEmailVerificationToken(userId: string): string {
+  return jwt.sign(
+    { sub: userId, purpose: 'email-verify' },
+    env.JWT_SECRET,
+    { expiresIn: EMAIL_VERIFY_TTL },
+  );
+}
+
+/**
+ * Vérifie et décode le token email.
+ * Lève AppError avec code TOKEN_EXPIRED si expiré, INVALID_VERIFICATION_TOKEN sinon.
+ */
+function decodeEmailVerificationToken(token: string): string {
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; purpose: string };
+    if (payload.purpose !== 'email-verify') throw new Error('wrong purpose');
+    return payload.sub; // userId
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      throw AppError.badRequest(
+        'Le lien de vérification a expiré (validité : 24 h). '
+        + 'Demandez un nouveau lien depuis l\'application.',
+        'TOKEN_EXPIRED',
+      );
+    }
+    throw AppError.badRequest(
+      'Lien de vérification invalide ou déjà utilisé.',
+      'INVALID_VERIFICATION_TOKEN',
+    );
+  }
+}
+
 function signAccessToken(user: User): string {
   return jwt.sign({ sub: user.id, role: user.role }, env.JWT_SECRET, {
     expiresIn: ACCESS_TTL,
@@ -59,6 +94,7 @@ function publicUser(user: User): {
   badgeNumber: string | null;
   email: string;
   telephone: string | null;
+  photoUrl: string | null;
   actif: boolean;
   mustChangePassword: boolean;
   emailVerified: boolean;
@@ -70,6 +106,7 @@ function publicUser(user: User): {
     badgeNumber: user.badgeNumber,
     email: user.email,
     telephone: user.telephone,
+    photoUrl: user.photoUrl ?? null,
     actif: user.actif,
     mustChangePassword: user.mustChangePassword,
     emailVerified: user.emailVerified,
@@ -213,8 +250,12 @@ export async function register(
   }
 
   const pinHash = await bcrypt.hash(pin, 12);
-  const emailVerificationToken = randomBytes(32).toString('hex');
 
+  // En développement : email auto-vérifié → connexion immédiate sans lien.
+  // En production : emailVerified=false → le citoyen doit cliquer sur le lien (24 h).
+  const isDev = env.NODE_ENV !== 'production';
+
+  // Créer d'abord l'utilisateur (on a besoin de son id pour signer le token)
   const user = await prisma.user.create({
     data: {
       email,
@@ -222,42 +263,75 @@ export async function register(
       telephone,
       pinHash,
       role: 'CITOYEN',
-      emailVerified: false,
-      emailVerificationToken,
+      emailVerified: isDev, // true en dev → connexion immédiate
+      emailVerificationToken: null,
     },
   });
 
-  // Envoyer le mail de vérification (non bloquant)
-  void sendVerificationEmail(email, name, emailVerificationToken).catch((err) => {
-    console.error('[email] Échec envoi vérification :', err);
-  });
+  // Générer le token JWT de vérification (signé, expire dans 24 h)
+  const emailVerificationToken = signEmailVerificationToken(user.id);
 
-  // Émettre les tokens JWT (l'accès au dashboard est bloqué par emailVerified=false)
+  if (!isDev) {
+    // Stocker le token dans la base (utilisé pour la révocation "déjà utilisé")
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerificationToken },
+    });
+  }
+
+  // Émettre les tokens d'accès JWT
   const token = signAccessToken(user);
   const refreshToken = await issueRefreshToken(user.id);
 
   await audit(prisma, { userId: user.id, action: 'REGISTER', ip });
 
-  // En mode développement (pas de SMTP), inclure le lien dans la réponse API
-  const isStub = !process.env['SMTP_HOST'];
-  const verificationUrl = isStub
-    ? `${env.BASE_URL}/api/auth/verify-email?token=${emailVerificationToken}`
-    : undefined;
+  let verificationUrl: string | undefined;
+
+  if (isDev) {
+    // Compte déjà actif en dev. On tente d'envoyer le mail si SMTP est configuré.
+    try {
+      await sendVerificationEmail(email, name, emailVerificationToken);
+      console.info(`[email] ✅ Mail de bienvenue envoyé à ${email}`);
+    } catch (err) {
+      console.warn(`[email] ⚠️  Échec envoi mail à ${email} :`, (err as Error).message);
+      // Non bloquant — le compte est déjà actif
+    }
+  } else {
+    // Production : envoi obligatoire
+    const rawUrl = `${env.BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(emailVerificationToken)}`;
+    try {
+      await sendVerificationEmail(email, name, emailVerificationToken);
+    } catch (err) {
+      console.error('[email] Échec envoi vérification :', err);
+      verificationUrl = rawUrl; // Retourner l'URL pour déblocage manuel (mode stub)
+    }
+  }
 
   return { token, refreshToken, user: publicUser(user), verificationUrl };
 }
 
-// Vérification de l'email via token
+// Vérification de l'email via token JWT (expiration 24 h, OWASP)
 export async function verifyEmail(token: string): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { emailVerificationToken: token },
-  });
+  // 1. Décoder et vérifier la signature + expiration (lève TOKEN_EXPIRED si expiré)
+  const userId = decodeEmailVerificationToken(token);
+
+  // 2. Retrouver l'utilisateur et vérifier que le token n'a pas déjà été consommé
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
+    throw AppError.badRequest('Compte introuvable.', 'INVALID_VERIFICATION_TOKEN');
+  }
+  if (user.emailVerified) {
+    // Déjà vérifié : idempotent (pas d'erreur, la page HTML dira succès)
+    return;
+  }
+  if (user.emailVerificationToken !== token) {
+    // Token révoqué (un renvoi plus récent a remplacé ce token)
     throw AppError.badRequest(
-      'Lien de vérification invalide ou déjà utilisé.',
+      'Ce lien a été remplacé par un lien plus récent.',
       'INVALID_VERIFICATION_TOKEN',
     );
   }
+
   await prisma.user.update({
     where: { id: user.id },
     data: { emailVerified: true, emailVerificationToken: null },
@@ -273,23 +347,29 @@ export async function resendVerification(
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || user.role !== 'CITOYEN' || user.emailVerified) return {};
 
-  // Générer un nouveau token
-  const emailVerificationToken = randomBytes(32).toString('hex');
+  // Générer un nouveau token JWT (24 h) — révoque implicitement l'ancien
+  const emailVerificationToken = signEmailVerificationToken(user.id);
   await prisma.user.update({
     where: { id: user.id },
     data: { emailVerificationToken },
   });
 
-  void sendVerificationEmail(email, user.name, emailVerificationToken).catch(
-    (err) => console.error('[email] Échec renvoi :', err),
-  );
-
   await audit(prisma, { userId: user.id, action: 'VERIFICATION_RESENT', ip });
 
-  const isStub = !process.env['SMTP_HOST'];
-  return isStub
-    ? { verificationUrl: `${env.BASE_URL}/api/auth/verify-email?token=${emailVerificationToken}` }
-    : {};
+  const rawUrl = `${env.BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(emailVerificationToken)}`;
+  let verificationUrl: string | undefined;
+
+  try {
+    await sendVerificationEmail(email, user.name, emailVerificationToken);
+    if (env.NODE_ENV !== 'production') {
+      verificationUrl = rawUrl;
+    }
+  } catch (err) {
+    console.error('[email] Échec renvoi vérification :', err);
+    verificationUrl = rawUrl;
+  }
+
+  return { verificationUrl };
 }
 
 export async function getMe(userId: string): Promise<ReturnType<typeof publicUser>> {
@@ -298,6 +378,57 @@ export async function getMe(userId: string): Promise<ReturnType<typeof publicUse
     throw AppError.notFound('Utilisateur introuvable', 'USER_NOT_FOUND');
   }
   return publicUser(user);
+}
+
+// Mise à jour du profil (nom, téléphone).
+export async function updateProfile(
+  userId: string,
+  name?: string,
+  telephone?: string,
+): Promise<ReturnType<typeof publicUser>> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw AppError.notFound('Utilisateur introuvable', 'USER_NOT_FOUND');
+  }
+
+  const data: { name?: string; telephone?: string } = {};
+  if (name !== undefined && name.trim().length > 0) data.name = name.trim();
+  if (telephone !== undefined) data.telephone = telephone.trim();
+
+  const updated = await prisma.user.update({ where: { id: userId }, data });
+  return publicUser(updated);
+}
+
+// Upload de photo de profil (base64). Stockée sur R2 ou stub local.
+export async function uploadProfilePhoto(
+  userId: string,
+  imageBase64: string,
+  mimeType: string,
+  adapters: import('../../adapters/types').Adapters,
+): Promise<{ photoUrl: string }> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw AppError.notFound('Utilisateur introuvable', 'USER_NOT_FOUND');
+
+  const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  if (!allowed.includes(mimeType)) {
+    throw AppError.badRequest('Format non supporté. Utilisez JPEG, PNG ou WebP.', 'INVALID_MIME_TYPE');
+  }
+
+  // Limiter à 2 Mo
+  const bytes = Buffer.from(imageBase64, 'base64');
+  if (bytes.length > 2 * 1024 * 1024) {
+    throw AppError.badRequest('L\'image ne doit pas dépasser 2 Mo.', 'IMAGE_TOO_LARGE');
+  }
+
+  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const key = `avatars/${userId}.${ext}`;
+
+  await adapters.storage.upload(key, bytes, mimeType);
+  const photoUrl = await adapters.storage.signedUrl(key, 365 * 24 * 3600); // 1 an
+
+  await prisma.user.update({ where: { id: userId }, data: { photoUrl } });
+
+  return { photoUrl };
 }
 
 // Changement de mot de passe (obligatoire au 1er login ou volontaire).
@@ -329,4 +460,52 @@ export async function changePassword(
   await audit(prisma, { userId, action: 'PASSWORD_CHANGED', ip });
 
   return publicUser(updated);
+}
+
+// ── Récupération de mot de passe ─────────────────────────────────────────────
+const RESET_TTL_SECONDS = 3600; // 1 heure
+
+function resetKey(token: string): string {
+  return `reset:${token}`;
+}
+
+// Étape 1 : génère un token de réinitialisation, envoie l'email.
+// Anti-enumeration : retourne toujours succès même si l'email n'existe pas.
+export async function forgotPassword(email: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (!user || !user.actif) return; // silencieux
+
+  const token = randomUUID();
+  await redis.set(resetKey(token), user.id, 'EX', RESET_TTL_SECONDS);
+
+  try {
+    await sendPasswordResetEmail(email, user.name, token);
+  } catch {
+    // Email non bloquant — le token est déjà en Redis
+  }
+}
+
+// Étape 2 : valide le token, change le mot de passe.
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const userId = await redis.get(resetKey(token));
+  if (!userId) {
+    throw AppError.badRequest('Lien expiré ou invalide. Recommencez.', 'RESET_TOKEN_INVALID');
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.actif) {
+    throw AppError.notFound('Compte introuvable', 'USER_NOT_FOUND');
+  }
+
+  const pinHash = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { pinHash, mustChangePassword: false },
+  });
+
+  // Invalider le token + révoquer toutes les sessions
+  await redis.del(resetKey(token));
+  await revokeAllRefreshTokens(userId);
+
+  await audit(prisma, { userId, action: 'PASSWORD_RESET', ip: null });
 }

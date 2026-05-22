@@ -52,4 +52,11 @@ export const smsTemplates = {
       ` Sans réponse, votre dossier sera transmis au Procureur. PNC.`
     );
   },
+
+  rappelEcheance(params: { ref: string; montant: number; echeance: Date }): string {
+    return (
+      `⚠️ RAPPEL : Votre amende #${params.ref} (${params.montant} XAF) expire le ${formatDate(params.echeance)}.\n` +
+      ` Payez via Mobile Money avant cette date pour éviter des majorations. PNC Congo.`
+    );
+  },
 };

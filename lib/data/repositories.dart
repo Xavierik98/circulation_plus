@@ -94,6 +94,42 @@ class AuthRepository {
     return data;
   }
 
+  /// Création d'un compte agent par l'admin (rôle POLICE).
+  Future<Map<String, dynamic>> createAgent({
+    required String name,
+    required String email,
+    required String telephone,
+    required String badge,
+    required String rank,
+    required String department,
+    required String password,
+  }) async {
+    final data = await _api.post(
+      '/api/officers',
+      body: {
+        'name': name,
+        'email': email,
+        'telephone': telephone,
+        'badgeNumber': badge,
+        'rank': rank,
+        'departement': department,
+        'pin': password,
+      },
+    ) as Map<String, dynamic>;
+    return data;
+  }
+
+  /// Upload photo de profil (base64 ≤ 2 Mo).
+  Future<Map<String, dynamic>> uploadPhoto(
+    String imageBase64,
+    String mimeType,
+  ) async {
+    return await _api.post('/api/auth/profile/photo', body: {
+      'imageBase64': imageBase64,
+      'mimeType': mimeType,
+    }) as Map<String, dynamic>;
+  }
+
   Future<bool> hasSession() => _api.hasAccessToken();
 }
 
@@ -190,6 +226,42 @@ class OfficerRepository {
           body: {'csvContent': csvContent}) as Map<String, dynamic>;
 }
 
+class PaymentRepository {
+  final ApiClient _api = ApiClient.instance;
+
+  /// Initier un paiement Mobile Money. Retourne { paymentUrl, reference }.
+  Future<Map<String, dynamic>> initiateMomo({
+    required String fineId,
+    required String operateur, // 'MTN' | 'AIRTEL'
+    required String telephone,
+  }) async {
+    return await _api.post('/api/payments/initiate', body: {
+      'fineId': fineId,
+      'operateur': operateur,
+      'telephone': telephone,
+    }) as Map<String, dynamic>;
+  }
+
+  /// Enregistrer un paiement Trésor public. Retourne { paymentId, reference }.
+  Future<Map<String, dynamic>> recordTresor({
+    required String fineId,
+    required String quittanceNumero,
+    String? quittanceDate,
+    String? agentTresor,
+  }) async {
+    return await _api.post('/api/payments/tresor', body: {
+      'fineId': fineId,
+      'quittanceNumero': quittanceNumero,
+      if (quittanceDate != null) 'quittanceDate': quittanceDate,
+      if (agentTresor != null && agentTresor.isNotEmpty) 'agentTresor': agentTresor,
+    }) as Map<String, dynamic>;
+  }
+
+  /// Reçu de paiement (paiement + répartition + fine).
+  Future<Map<String, dynamic>> receipt(String paymentId) async =>
+      await _api.get('/api/payments/receipt/$paymentId') as Map<String, dynamic>;
+}
+
 class NotificationRepository {
   final ApiClient _api = ApiClient.instance;
 
@@ -231,6 +303,9 @@ class DriverRepository {
 
 class StatsRepository {
   final ApiClient _api = ApiClient.instance;
+
+  Future<Map<String, dynamic>> officerStats() async =>
+      await _api.get('/api/stats/me') as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> revenue({String? from, String? to}) async =>
       await _api.get('/api/stats/revenue', query: {

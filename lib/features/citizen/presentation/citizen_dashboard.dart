@@ -8,6 +8,7 @@ import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../data/providers.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 class CitizenDashboard extends ConsumerWidget {
   const CitizenDashboard({super.key});
@@ -170,19 +171,14 @@ class CitizenDashboard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: pendingCount > 0
-                      ? AppColors.warningGradient
-                      : AppColors.successGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(initials,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
-                ),
+              UserAvatar(
+                size: 52,
+                editable: false,
+                photoUrl: auth.photoUrl,
+                initials: initials,
+                gradient: pendingCount > 0
+                    ? AppColors.warningGradient
+                    : AppColors.successGradient,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -214,10 +210,10 @@ class CitizenDashboard extends ConsumerWidget {
                 color: totalDebt > 0 ? AppColors.error : AppColors.success,
               ),
               _VerticalDivider(),
-              const _BannerStat(
-                label: 'Points permis',
-                value: '9/12',
-                color: AppColors.warning,
+              _BannerStat(
+                label: 'Statut',
+                value: pendingCount > 0 ? 'ALERTE' : 'OK',
+                color: pendingCount > 0 ? AppColors.error : AppColors.success,
               ),
             ],
           ),

@@ -2,6 +2,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/officer_model.dart';
@@ -9,6 +10,7 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../data/providers.dart';
 import '../../../data/repositories.dart';
+import '../../../data/api_client.dart';
 
 class OfficersManagementScreen extends ConsumerStatefulWidget {
   const OfficersManagementScreen({super.key});
@@ -41,7 +43,7 @@ class _OfficersManagementScreenState
           IconButton(
             tooltip: 'Ajouter un agent',
             icon: const Icon(Icons.person_add_rounded, color: AppColors.primary),
-            onPressed: () => _showAddOfficerDialog(context),
+            onPressed: () => context.push('/admin/add-agent'),
           ),
           IconButton(
             tooltip: 'Import CSV',
@@ -95,108 +97,6 @@ class _OfficersManagementScreenState
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Dialogue : ajout manuel d'un agent ────────────────────────────────────
-  void _showAddOfficerDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    final nameCtrl  = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final badgeCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final pinCtrl   = TextEditingController();
-    bool loading = false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: Text('Nouvel agent', style: AppTextStyles.titleMedium),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _dialogField(nameCtrl,  'Nom complet *',              Icons.person_rounded),
-                    const SizedBox(height: 12),
-                    _dialogField(emailCtrl, 'Email @pnc.cg *',            Icons.email_rounded,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Requis';
-                        if (!v.toLowerCase().endsWith('@pnc.cg')) return 'Domaine @pnc.cg obligatoire';
-                        return null;
-                      }),
-                    const SizedBox(height: 12),
-                    _dialogField(badgeCtrl, 'Matricule (ex: PNC-2024-042)', Icons.badge_rounded),
-                    const SizedBox(height: 12),
-                    _dialogField(phoneCtrl, 'Téléphone',                   Icons.phone_rounded),
-                    const SizedBox(height: 12),
-                    _dialogField(pinCtrl,   'Mot de passe temporaire *',   Icons.lock_rounded,
-                      obscure: true,
-                      validator: (v) {
-                        if (v == null || v.length < 10) return 'Min. 10 caractères';
-                        if (!v.contains(RegExp(r'[A-Z]'))) return 'Majuscule requise';
-                        if (!v.contains(RegExp(r'[0-9]'))) return 'Chiffre requis';
-                        if (!v.contains(RegExp('[!@#\$%^&*()\\-_=+\\[\\]{};:\'",.<>/?\\\\|`~]'))) return 'Caractère spécial requis';
-                        return null;
-                      }),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Le compte sera créé avec mustChangePassword = true.',
-                      style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Annuler', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: loading ? null : () async {
-                if (!formKey.currentState!.validate()) return;
-                setLocal(() => loading = true);
-                final nav          = Navigator.of(ctx);
-                final messenger    = ScaffoldMessenger.of(context);
-                final ctxMessenger = ScaffoldMessenger.of(ctx);
-                try {
-                  await OfficerRepository().create({
-                    'name':        nameCtrl.text.trim(),
-                    'email':       emailCtrl.text.trim(),
-                    'badgeNumber': badgeCtrl.text.trim().isEmpty ? null : badgeCtrl.text.trim(),
-                    'telephone':   phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                    'pin':         pinCtrl.text,
-                  });
-                  nav.pop();
-                  ref.invalidate(officersProvider(_searchQuery));
-                  messenger.showSnackBar(const SnackBar(
-                    content: Text('Agent créé avec succès'),
-                    backgroundColor: AppColors.success,
-                  ));
-                } catch (e) {
-                  setLocal(() => loading = false);
-                  ctxMessenger.showSnackBar(SnackBar(
-                    content: Text('Erreur : $e'),
-                    backgroundColor: AppColors.error,
-                  ));
-                }
-              },
-              child: loading
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Créer', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -340,26 +240,6 @@ class _OfficersManagementScreenState
     );
   }
 
-  Widget _dialogField(
-    TextEditingController ctrl,
-    String hint,
-    IconData icon, {
-    bool obscure = false,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: ctrl,
-      obscureText: obscure,
-      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 18, color: AppColors.primary),
-        isDense: true,
-      ),
-      validator: validator ?? (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
-    );
-  }
-
   Widget _buildSearchBar() {
     return Container(
       color: AppColors.surface,
@@ -437,6 +317,180 @@ class _OfficerCard extends StatelessWidget {
   final OfficerModel officer;
   const _OfficerCard({required this.officer});
 
+  void _showSanctionSheet(BuildContext context) {
+    String? selectedType;
+    final motifCtrl = TextEditingController();
+    bool loading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Sanctionner ${officer.fullName}',
+                          style: AppTextStyles.titleSmall),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: AppColors.textSecondary, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedType,
+                  dropdownColor: AppColors.surface,
+                  decoration: InputDecoration(
+                    labelText: 'Type de sanction',
+                    labelStyle: AppTextStyles.bodySmall,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'AVERTISSEMENT',
+                      child: Text('Avertissement'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'BLAME',
+                      child: Text('Blâme'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'SUSPENSION_TEMPORAIRE',
+                      child: Text('Suspension temporaire'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'REVOCATION',
+                      child: Text('Révocation'),
+                    ),
+                  ],
+                  onChanged: (v) => setLocal(() => selectedType = v),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: motifCtrl,
+                  maxLines: 3,
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Motif (obligatoire)',
+                    labelStyle: AppTextStyles.bodySmall,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: loading
+                        ? null
+                        : () async {
+                            if (selectedType == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Sélectionnez un type de sanction'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                              return;
+                            }
+                            if (motifCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Le motif est obligatoire'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                              return;
+                            }
+                            setLocal(() => loading = true);
+                            try {
+                              await ApiClient.instance.post(
+                                '/api/officers/${officer.id}/sanctions',
+                                body: {
+                                  'type': selectedType,
+                                  'motif': motifCtrl.text.trim(),
+                                },
+                              );
+                              if (ctx.mounted) {
+                                Navigator.of(ctx).pop();
+                              }
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'Sanction appliquée à ${officer.fullName}'),
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                );
+                              }
+                            } on ApiException catch (e) {
+                              setLocal(() => loading = false);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.message),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              setLocal(() => loading = false);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Erreur lors de l\'application de la sanction.'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : Text('Appliquer la sanction',
+                            style: AppTextStyles.labelMedium
+                                .copyWith(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PremiumCard(
@@ -479,6 +533,25 @@ class _OfficerCard extends StatelessWidget {
                       _formatLastActivity(officer.lastActivity!),
                       style: AppTextStyles.caption,
                     ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: () => _showSanctionSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: AppColors.error.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'Sanctionner',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.error),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],

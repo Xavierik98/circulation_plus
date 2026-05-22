@@ -50,6 +50,12 @@ final officersProvider = FutureProvider.autoDispose
   return page.items;
 });
 
+/// Statistiques personnelles de l'agent connecté.
+final officerStatsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+  return ref.read(statsRepositoryProvider).officerStats();
+});
+
 /// Statistiques de revenus (admin).
 final revenueStatsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) {

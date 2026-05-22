@@ -97,6 +97,37 @@ export async function getRevenueStats(range: DateRange): Promise<RevenueStats> {
   };
 }
 
+export async function getOfficerStats(officerId: string): Promise<{
+  totalInfractions: number;
+  monthInfractions: number;
+  totalRevenue: number;
+  paymentRate: number;
+}> {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [totalInfractions, monthInfractions, paidFines] = await Promise.all([
+    prisma.fine.count({ where: { officerId } }),
+    prisma.fine.count({
+      where: { officerId, verbaliseLe: { gte: firstOfMonth } },
+    }),
+    prisma.fine.count({ where: { officerId, status: 'PAID' } }),
+  ]);
+
+  const revenueAgg = await prisma.fine.aggregate({
+    where: { officerId, status: 'PAID' },
+    _sum: { montantTotal: true },
+  });
+
+  const totalRevenue = revenueAgg._sum.montantTotal ?? 0;
+  const paymentRate =
+    totalInfractions > 0
+      ? Math.round((paidFines / totalInfractions) * 100)
+      : 0;
+
+  return { totalInfractions, monthInfractions, totalRevenue, paymentRate };
+}
+
 export async function getHeatmap(): Promise<
   { latitude: number; longitude: number; count: number }[]
 > {

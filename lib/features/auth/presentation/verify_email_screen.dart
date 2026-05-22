@@ -29,7 +29,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
-    _devUrl = widget.devVerificationUrl;
+    // Priorité : paramètre direct → sinon valeur stockée dans l'AuthState
+    // (le redirect GoRouter fait perdre l'extra, donc on le récupère du provider)
+    _devUrl = widget.devVerificationUrl?.isNotEmpty == true
+        ? widget.devVerificationUrl
+        : null;
+    // On lira aussi depuis authProvider dans build() si _devUrl est encore null
   }
 
   String get _email =>
@@ -66,6 +71,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Récupérer l'URL depuis l'AuthState si elle n'a pas été passée en paramètre
+    final authUrl = ref.watch(authProvider).verificationUrl;
+    if (_devUrl == null && authUrl != null && authUrl.isNotEmpty) {
+      _devUrl = authUrl;
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(

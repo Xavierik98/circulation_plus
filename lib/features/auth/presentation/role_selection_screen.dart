@@ -97,35 +97,11 @@ class RoleSelectionScreen extends StatelessWidget {
 
                   const SizedBox(height: 14),
 
-                  const _RoleCard(
-                    role: 'citizen',
-                    title: 'Citoyen',
-                    subtitle: 'Amendes · Paiements · Permis de conduire',
-                    icon: Icons.person_rounded,
-                    gradient: LinearGradient(
-                      colors: [AppColors.congoGreen, Color(0xFF047857)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    accentColor: AppColors.congoGreen,
-                    delay: 500,
-                  ),
+                  const _CitizenRoleCard(delay: 500),
 
                   const SizedBox(height: 14),
 
-                  const _RoleCard(
-                    role: 'admin',
-                    title: 'Administration',
-                    subtitle: 'Analytique · Agents · Revenus nationaux',
-                    icon: Icons.admin_panel_settings_rounded,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF4338CA), Color(0xFF312E81)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    accentColor: Color(0xFF6366F1),
-                    delay: 600,
-                  ),
+                  const _AdminRoleCard(delay: 600),
 
                   const Spacer(),
 
@@ -304,103 +280,305 @@ class _PoliceRoleCard extends StatelessWidget {
   }
 }
 
-class _RoleCard extends StatelessWidget {
-  final String role;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Gradient gradient;
-  final Color accentColor;
+// ── Carte Citoyen ─────────────────────────────────────────────────────────────
+class _CitizenRoleCard extends StatelessWidget {
   final int delay;
-
-  const _RoleCard({
-    required this.role,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-    required this.accentColor,
-    required this.delay,
-  });
+  const _CitizenRoleCard({required this.delay});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/login/$role'),
+      onTap: () => context.push('/login/citizen'),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.cardBorder),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF003A1A), Color(0xFF00291A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: AppColors.congoGreen.withValues(alpha: 0.45), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: AppColors.congoGreen.withValues(alpha: 0.15),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Row(
           children: [
-            // Left accent bar
+            // Icône carte d'identité stylisée
             Container(
-              width: 3,
-              height: 48,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
-                gradient: gradient,
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.congoGreen.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: AppColors.congoGreen.withValues(alpha: 0.4)),
               ),
-            ),
-            const SizedBox(width: 14),
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: gradient,
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Lignes simulant une carte ID
+                  Positioned(
+                    bottom: 12,
+                    left: 10,
+                    right: 10,
+                    child: Column(
+                      children: [
+                        Container(
+                          height: 2,
+                          decoration: BoxDecoration(
+                            color: AppColors.congoGreen.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Container(
+                          height: 2,
+                          width: 20,
+                          decoration: BoxDecoration(
+                            color: AppColors.congoGreen.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const Icon(Icons.person_rounded,
+                      color: AppColors.congoGreen, size: 26),
                 ],
               ),
-              child: Icon(icon, color: Colors.white, size: 24),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTextStyles.titleMedium),
-                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text(
+                        'Citoyen',
+                        style: AppTextStyles.titleMedium
+                            .copyWith(color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.congoGreen.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                              color: AppColors.congoGreen
+                                  .withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          'RC',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.congoGreen,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
-                    subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+                    'Amendes · Paiements · Suivi dossier',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.textTertiary),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Container(
+                      height: 3,
+                      width: 70,
+                      decoration: const BoxDecoration(
+                          gradient: AppColors.congoFlagGradient),
+                    ),
                   ),
                 ],
               ),
             ),
             Container(
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: AppColors.cardBorder),
+                color: AppColors.congoGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.congoGreen.withValues(alpha: 0.3)),
               ),
               child: const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 12, color: AppColors.textTertiary),
+                  size: 13, color: AppColors.congoGreen),
             ),
           ],
         ),
       ),
     )
         .animate()
-        .fadeIn(delay: Duration(milliseconds: delay), duration: 400.ms)
-        .slideX(begin: 0.1, end: 0, delay: Duration(milliseconds: delay), duration: 400.ms);
+        .fadeIn(
+            delay: Duration(milliseconds: delay), duration: 400.ms)
+        .slideX(
+            begin: 0.1,
+            end: 0,
+            delay: Duration(milliseconds: delay),
+            duration: 400.ms);
+  }
+}
+
+// ── Carte Administration ───────────────────────────────────────────────────────
+class _AdminRoleCard extends StatelessWidget {
+  final int delay;
+  const _AdminRoleCard({required this.delay});
+
+  static const _indigo = Color(0xFF6366F1);
+  static const _indigoDark = Color(0xFF0E0C2A);
+  static const _indigoDark2 = Color(0xFF130F2D);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/login/admin'),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_indigoDark, _indigoDark2],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: _indigo.withValues(alpha: 0.45), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: _indigo.withValues(alpha: 0.15),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icône sceau institutionnel
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: _indigo.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border:
+                    Border.all(color: _indigo.withValues(alpha: 0.35)),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Cercle décoratif externe
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: _indigo.withValues(alpha: 0.25),
+                          width: 1.5),
+                    ),
+                  ),
+                  const Icon(Icons.account_balance_rounded,
+                      color: _indigo, size: 22),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Administration',
+                        style: AppTextStyles.titleMedium
+                            .copyWith(color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _indigo.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                              color: _indigo.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          'PNC',
+                          style: AppTextStyles.caption.copyWith(
+                            color: _indigo,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Analytique · Agents · Revenus nationaux',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.textTertiary),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Container(
+                      height: 3,
+                      width: 70,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _indigo,
+                            _indigo.withValues(alpha: 0.3),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _indigo.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border:
+                    Border.all(color: _indigo.withValues(alpha: 0.3)),
+              ),
+              child: const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 13, color: _indigo),
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(
+            delay: Duration(milliseconds: delay), duration: 400.ms)
+        .slideX(
+            begin: 0.1,
+            end: 0,
+            delay: Duration(milliseconds: delay),
+            duration: 400.ms);
   }
 }
 

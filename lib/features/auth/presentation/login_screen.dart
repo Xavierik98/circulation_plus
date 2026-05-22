@@ -268,6 +268,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: _isLoading ? null : _login,
                   ).animate().fadeIn(delay: 550.ms).slideY(begin: 0.3),
 
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.push('/forgot-password'),
+                      child: const Text(
+                        'Mot de passe oublié ?',
+                        style: TextStyle(
+                          color: AppColors.textTertiary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 600.ms),
+
                   // Inscription — citoyen uniquement
                   if (_userRole == UserRole.citizen) ...[
                     const SizedBox(height: 16),

@@ -188,16 +188,21 @@ export async function confirmPayment(
     const ref = fresh.fine.reference;
     const montant = fresh.montantTotal;
 
-    // SMS citoyen + agent
+    // SMS citoyen + agent (telephone peut être null si paiement Trésor public)
     try {
-      await adapters.sms.send(
-        fresh.telephone,
-        smsTemplates.paiementConfirmeContrevenant({ ref, montant }),
-      );
-      await adapters.sms.send(
-        fresh.fine.officer.telephone ?? fresh.telephone,
-        smsTemplates.paiementConfirmeAgent({ ref, montant }),
-      );
+      if (fresh.telephone) {
+        await adapters.sms.send(
+          fresh.telephone,
+          smsTemplates.paiementConfirmeContrevenant({ ref, montant }),
+        );
+      }
+      const agentTel = fresh.fine.officer.telephone ?? fresh.telephone;
+      if (agentTel) {
+        await adapters.sms.send(
+          agentTel,
+          smsTemplates.paiementConfirmeAgent({ ref, montant }),
+        );
+      }
     } catch {
       /* SMS non bloquant */
     }
@@ -234,6 +239,91 @@ export async function confirmPayment(
   }
 
   return { idempotent: false };
+}
+
+// Enregistre un paiement effectué au Trésor public (quittance physique).
+// La confirmation est immédiate : le citoyen/agent saisit le n° de quittance après
+// paiement en agence. Le paiement est directement marqué CONFIRMED.
+export async function recordTresorPayment(
+  user: AuthUser,
+  body: { fineId: string; quittanceNumero: string; quittanceDate?: string; agentTresor?: string },
+  adapters: Adapters,
+  ip: string | null,
+): Promise<{ paymentId: string; reference: string }> {
+  const fine = await prisma.fine.findFirst({
+    where: fineAccessWhere(user, body.fineId),
+    include: { officer: true, citizen: true },
+  });
+  if (!fine) throw AppError.notFound('Contravention introuvable', 'FINE_NOT_FOUND');
+  if (fine.status === 'PAID') throw AppError.conflict('Contravention déjà payée', 'FINE_ALREADY_PAID');
+
+  // Vérifier unicité quittance
+  const existingQuittance = await prisma.payment.findFirst({
+    where: { quittanceNumero: body.quittanceNumero },
+  });
+  if (existingQuittance) {
+    throw AppError.conflict('Ce numéro de quittance est déjà enregistré', 'QUITTANCE_DUPLICATE');
+  }
+
+  const parts = computeRepartition(fine.montantTotal);
+
+  const payment = await prisma.$transaction(async (tx) => {
+    const p = await tx.payment.create({
+      data: {
+        fineId: fine.id,
+        montantTotal: fine.montantTotal,
+        mode: 'TRESOR_PUBLIC',
+        quittanceNumero: body.quittanceNumero,
+        quittanceDate: body.quittanceDate ? new Date(body.quittanceDate) : new Date(),
+        agentTresor: body.agentTresor ?? null,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+      },
+    });
+    await tx.fine.update({
+      where: { id: fine.id },
+      data: { status: 'PAID' },
+    });
+    await tx.repartition.create({
+      data: { paymentId: p.id, ...parts },
+    });
+    await tx.auditLog.create({
+      data: {
+        fineId: fine.id,
+        action: 'PAYMENT_TRESOR_CONFIRMED',
+        details: { quittanceNumero: body.quittanceNumero, ...parts },
+        ip,
+      },
+    });
+    return p;
+  });
+
+  // Notifications post-commit (non bloquantes)
+  try {
+    await notify(prisma, adapters.push, {
+      userId: fine.officerId,
+      fcmToken: fine.officer.fcmToken ?? null,
+      title: '✅ Paiement Trésor confirmé',
+      body: `PV ${fine.reference} réglé au Trésor public (${fine.montantTotal} XAF).`,
+      type: 'payment_confirmed',
+      data: { fineId: fine.id, reference: fine.reference },
+    });
+  } catch { /* non bloquant */ }
+
+  if (fine.citizenId && fine.citizen) {
+    try {
+      await notify(prisma, adapters.push, {
+        userId: fine.citizenId,
+        fcmToken: fine.citizen.fcmToken ?? null,
+        title: '✅ Paiement Trésor enregistré',
+        body: `Votre paiement pour le PV ${fine.reference} a été enregistré.`,
+        type: 'payment_confirmed',
+        data: { fineId: fine.id, reference: fine.reference },
+      });
+    } catch { /* non bloquant */ }
+  }
+
+  return { paymentId: payment.id, reference: fine.reference };
 }
 
 export async function getReceipt(user: AuthUser, paymentId: string) {

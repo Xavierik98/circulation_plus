@@ -13,6 +13,22 @@ enum Role {
   ADMIN
 }
 
+/// 12 départements de la République du Congo.
+enum Departement {
+  BRAZZAVILLE
+  POINTE_NOIRE
+  BOUENZA
+  CUVETTE
+  CUVETTE_OUEST
+  KOUILOU
+  LEKOUMOU
+  LIKOUALA
+  NIARI
+  PLATEAUX
+  POOL
+  SANGHA
+}
+
 enum FineStatus {
   PENDING
   PAID
@@ -50,13 +66,24 @@ model User {
   // Token Firebase Cloud Messaging du terminal de l'agent (ajout : le spec exige
   // un push FCM mais ne stocke aucun token ; la Notification reste le canal durable).
   fcmToken    String?
+  /// URL de la photo de profil (stockée sur R2 ou stub local).
+  photoUrl    String?
+  /// Département d'affectation de l'agent (POLICE uniquement).
+  departement Departement?
+  /// Statut de service de l'agent (En service / Hors service).
+  onDuty      Boolean   @default(false)
+  lastLat     Float?
+  lastLng     Float?
+  lastSeenAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  finesAsOfficer Fine[]         @relation("OfficerFines")
-  finesAsCitizen Fine[]         @relation("CitizenFines")
-  notifications  Notification[]
-  auditLogs      AuditLog[]
+  finesAsOfficer   Fine[]      @relation("OfficerFines")
+  finesAsCitizen   Fine[]      @relation("CitizenFines")
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  sanctionsRecues  Sanction[]  @relation("OfficerSanctions")
+  sanctionsEmises  Sanction[]  @relation("AdminSanctions")
 
   @@index([email])
   @@index([badgeNumber])
@@ -129,6 +156,10 @@ model Fine {
   latitude      Float?
   longitude     Float?
   adresseApprox String?
+  /// Département où l'infraction a été constatée.
+  departementInfraction Departement?
+  /// Lieu précis (rue, carrefour, axe) renseigné par l'agent.
+  lieuPrecis    String?
 
   // Horodatage : verbaliseLe = valeur client validée ; createdAt = vérité serveur
   verbaliseLe DateTime
@@ -136,7 +167,11 @@ model Fine {
 
   signatureAgent        String?
   signatureContrevenant String?
-  refusSignature        Boolean @default(false)
+  refusSignature        Boolean  @default(false)
+  /// Documents saisis en cas de refus de signature (JSON array de strings).
+  documentsSeizes       Json?
+  /// Convocation déclenchée automatiquement en cas de refus de signature.
+  convocationRequise    Boolean  @default(false)
 
   status FineStatus @default(PENDING)
 
@@ -158,16 +193,33 @@ model Fine {
   @@index([verbaliseLe])
 }
 
+/// Mode de paiement d'une amende.
+enum PaymentMode {
+  MOBILE_MONEY   // MTN / Airtel Money
+  TRESOR_PUBLIC  // Paiement physique au Trésor public avec quittance
+}
+
 model Payment {
   id     String @id @default(uuid())
   fineId String @unique
   fine   Fine   @relation(fields: [fineId], references: [id])
 
   montantTotal Int
-  operateur    String // "MTN" | "AIRTEL"
-  telephone    String
+  mode         PaymentMode @default(MOBILE_MONEY)
 
-  transactionId String        @unique
+  // Mobile Money (optionnel si mode = TRESOR_PUBLIC)
+  operateur    String?  // "MTN" | "AIRTEL"
+  telephone    String?
+  transactionId String? @unique
+
+  // Trésor public (optionnel si mode = MOBILE_MONEY)
+  /// Numéro de quittance délivré par le Trésor public.
+  quittanceNumero String?
+  /// Date de paiement au guichet du Trésor.
+  quittanceDate   DateTime?
+  /// Agent du Trésor ayant encaissé (optionnel).
+  agentTresor     String?
+
   status        PaymentStatus @default(PENDING)
 
   initiatedAt DateTime  @default(now())
@@ -176,6 +228,7 @@ model Payment {
   repartition Repartition?
 
   @@index([transactionId])
+  @@index([quittanceNumero])
 }
 
 model Repartition {
@@ -265,4 +318,24 @@ model LicenseVerification {
 model FineCounter {
   year    Int @id
   lastSeq Int @default(0)
+}
+
+enum SanctionType {
+  AVERTISSEMENT
+  BLAME
+  SUSPENSION_TEMPORAIRE
+  REVOCATION
+}
+
+model Sanction {
+  id        String       @id @default(uuid())
+  officerId String
+  officer   User         @relation("OfficerSanctions", fields: [officerId], references: [id])
+  adminId   String
+  admin     User         @relation("AdminSanctions", fields: [adminId], references: [id])
+  motif     String
+  type      SanctionType
+  createdAt DateTime     @default(now())
+
+  @@index([officerId])
 }

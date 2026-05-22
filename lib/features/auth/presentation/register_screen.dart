@@ -55,10 +55,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _isLoading = false);
 
     if (verificationUrl == null) {
-      // Erreur
+      // Erreur (null = exception dans le notifier)
       _showSnack(ref.read(authProvider).error ?? 'Erreur lors de l\'inscription');
+    } else if (ref.read(authProvider).emailVerified) {
+      // Mode développement : compte auto-vérifié → dashboard citoyen directement
+      context.go('/citizen');
     } else {
-      // Succès → écran de vérification
+      // Mode production : email de vérification requis
       context.go(
         '/verify-email',
         extra: {'email': email, 'devUrl': verificationUrl},

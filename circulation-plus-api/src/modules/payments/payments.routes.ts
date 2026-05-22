@@ -6,9 +6,10 @@ import { authorize } from '../../shared/middleware/authorize';
 import { AppError } from '../../shared/errors/AppError';
 import {
   initiatePaymentSchema,
+  tresorPaymentSchema,
   receiptParamsSchema,
 } from './payments.schema';
-import { initiatePayment, confirmPayment, getReceipt } from './payments.service';
+import { initiatePayment, confirmPayment, recordTresorPayment, getReceipt } from './payments.service';
 
 export async function paymentsRoutes(app: FastifyInstance): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -61,6 +62,26 @@ export async function paymentsRoutes(app: FastifyInstance): Promise<void> {
       );
       return ok({ confirmed: !result.idempotent, idempotent: result.idempotent });
     },
+  );
+
+  // POST /api/payments/tresor — CITOYEN, POLICE, ADMIN (paiement Trésor public).
+  r.post(
+    '/tresor',
+    {
+      preHandler: [authenticate, authorize('CITOYEN', 'POLICE', 'ADMIN')],
+      schema: {
+        tags: ['Paiements'],
+        summary: 'Enregistrer un paiement au Trésor public',
+        description:
+          'Rôles autorisés : CITOYEN, POLICE, ADMIN. '  +
+          'Crée un Payment CONFIRMED immédiatement (quittance physique). '  +
+          'Codes : FINE_NOT_FOUND (404), FINE_ALREADY_PAID (409), QUITTANCE_DUPLICATE (409).',
+        security: [{ bearerAuth: [] }],
+        body: tresorPaymentSchema,
+      },
+    },
+    async (request) =>
+      ok(await recordTresorPayment(request.user!, request.body, app.adapters, request.ip)),
   );
 
   // GET /api/payments/receipt/:id — authentifié (RLS).

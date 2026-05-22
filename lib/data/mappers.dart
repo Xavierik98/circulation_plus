@@ -116,24 +116,46 @@ NotificationModel notificationFromJson(Map<String, dynamic> j) {
   );
 }
 
-InfractionCategory _category(String code) {
-  if (code.startsWith('EXV') || code.startsWith('DEP')) {
+InfractionCategory _categoryFromCode(String code) {
+  final c = code.toUpperCase();
+  // Vitesse
+  if (c.startsWith('EXV') || c.startsWith('VIT') || c.startsWith('DEP')) {
     return InfractionCategory.speed;
   }
-  if (code.startsWith('STA')) return InfractionCategory.parking;
-  if (code.startsWith('PER') ||
-      code.startsWith('CGR') ||
-      code.startsWith('ASS')) {
+  // Stationnement
+  if (c.startsWith('STA') || c.startsWith('STAT') || c.startsWith('GAR')) {
+    return InfractionCategory.parking;
+  }
+  // Documents
+  if (c.startsWith('PER') || c.startsWith('CGR') || c.startsWith('ASS') ||
+      c.startsWith('CTN') || c.startsWith('DOC') || c.startsWith('IMM')) {
     return InfractionCategory.documents;
   }
-  if (code.startsWith('FEU') ||
-      code.startsWith('TEL') ||
-      code.startsWith('PRI') ||
-      code.startsWith('ALC')) {
+  // Comportement
+  if (c.startsWith('FEU') || c.startsWith('TEL') || c.startsWith('PRI') ||
+      c.startsWith('ALC') || c.startsWith('CTR') || c.startsWith('COMP') ||
+      c.startsWith('DEP') || c.startsWith('CON') || c.startsWith('CEI') && c.length < 6) {
     return InfractionCategory.behavior;
   }
+  // Sécurité (défaut)
   return InfractionCategory.safety;
 }
+
+InfractionCategory _categoryFromString(String? s) {
+  switch ((s ?? '').toUpperCase()) {
+    case 'VITESSE':       return InfractionCategory.speed;
+    case 'SPEED':        return InfractionCategory.speed;
+    case 'STATIONNEMENT': return InfractionCategory.parking;
+    case 'PARKING':      return InfractionCategory.parking;
+    case 'DOCUMENTS':    return InfractionCategory.documents;
+    case 'COMPORTEMENT': return InfractionCategory.behavior;
+    case 'BEHAVIOR':     return InfractionCategory.behavior;
+    case 'SECURITE':     return InfractionCategory.safety;
+    case 'SAFETY':       return InfractionCategory.safety;
+    default:             return InfractionCategory.safety;
+  }
+}
+
 
 const _categoryIcon = {
   InfractionCategory.speed: '🚗',
@@ -145,8 +167,12 @@ const _categoryIcon = {
 
 InfractionType infractionFromJson(Map<String, dynamic> j) {
   final code = j['code'] as String? ?? '';
-  final cat = _category(code);
-  final label = j['libelle'] as String? ?? '';
+  // Priorité : champ categorie du backend → puis déduction depuis le code
+  final rawCat = j['categorie'] as String? ?? j['category'] as String?;
+  final cat = rawCat != null && rawCat.isNotEmpty
+      ? _categoryFromString(rawCat)
+      : _categoryFromCode(code);
+  final label = j['libelle'] as String? ?? j['label'] as String? ?? '';
   return InfractionType(
     id: j['id'] as String,
     code: code,

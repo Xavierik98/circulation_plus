@@ -1,26 +1,31 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../theme/app_text_styles.dart';
+import '../../../../shared/models/interpellation_state.dart';
+import '../../../../shared/models/department_model.dart';
 import '../../../../shared/widgets/premium_button.dart';
 
-class SignatureScreen extends StatefulWidget {
+class SignatureScreen extends ConsumerStatefulWidget {
   const SignatureScreen({super.key});
 
   @override
-  State<SignatureScreen> createState() => _SignatureScreenState();
+  ConsumerState<SignatureScreen> createState() => _SignatureScreenState();
 }
 
-class _SignatureScreenState extends State<SignatureScreen> {
+class _SignatureScreenState extends ConsumerState<SignatureScreen> {
   final List<List<Offset>> _strokes = [];
   List<Offset> _currentStroke = [];
   bool _hasSignature = false;
+  bool _refusedToSign = false;
 
   void _onPanStart(DragStartDetails details) {
     setState(() {
       _currentStroke = [details.localPosition];
       _hasSignature = true;
+      _refusedToSign = false; // Signer annule le refus
     });
   }
 
@@ -47,6 +52,8 @@ class _SignatureScreenState extends State<SignatureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final interpellation = ref.watch(interpellationProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -66,7 +73,7 @@ class _SignatureScreenState extends State<SignatureScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Signature numérique', style: AppTextStyles.titleSmall),
-            Text('Étape 5 sur 5', style: AppTextStyles.caption),
+            Text('Étape 6 sur 6', style: AppTextStyles.caption),
           ],
         ),
         bottom: const PreferredSize(
@@ -86,22 +93,26 @@ class _SignatureScreenState extends State<SignatureScreen> {
           children: [
             const SizedBox(height: 8),
 
-            // Info card
+            // ── Info légale ──────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.primaryGlow,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.primary),
+                  const Icon(Icons.info_outline_rounded,
+                      size: 18, color: AppColors.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'La signature du conducteur confirme la réception de l\'avis d\'infraction. Ce document a une valeur légale.',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                      'La signature du conducteur confirme la réception de '
+                      'l\'avis d\'infraction. Ce document a une valeur légale.',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textSecondary),
                     ),
                   ),
                 ],
@@ -110,29 +121,27 @@ class _SignatureScreenState extends State<SignatureScreen> {
 
             const SizedBox(height: 24),
 
-            // Summary before signature
-            _buildSummary(),
+            // ── Résumé de l'interpellation ───────────────────────
+            _buildSummary(interpellation),
 
             const SizedBox(height: 24),
 
-            // Officer signature
+            // ── Signature agent ───────────────────────────────────
             Text('Signature de l\'agent', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Agent PNB-4521 — Jean-Pierre Moukala',
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
-            ),
             const SizedBox(height: 12),
-            _buildSignaturePad('officer'),
+            _buildSignaturePadFixed(),
 
             const SizedBox(height: 20),
 
-            // Driver signature
+            // ── Signature conducteur ──────────────────────────────
             Text('Signature du conducteur', style: AppTextStyles.titleMedium),
             const SizedBox(height: 8),
             Text(
-              'Thierry Nguesso — Permis BZV-2024-047821',
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+              interpellation.driverName.isNotEmpty
+                  ? interpellation.driverName
+                  : 'Conducteur',
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: AppColors.textTertiary),
             ),
             const SizedBox(height: 12),
             _buildSignaturePadInteractive(),
@@ -144,26 +153,41 @@ class _SignatureScreenState extends State<SignatureScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    const Icon(Icons.refresh_rounded, size: 14, color: AppColors.textTertiary),
+                    const Icon(Icons.refresh_rounded,
+                        size: 14, color: AppColors.textTertiary),
                     const SizedBox(width: 4),
-                    Text('Effacer', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary)),
+                    Text(
+                      'Effacer',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textTertiary),
+                    ),
                   ],
                 ),
               ),
             ],
 
+            const SizedBox(height: 20),
+
+            // ── Option refus ──────────────────────────────────────
+            _buildRefusalOption(),
+
             const SizedBox(height: 24),
 
-            // Confirm checkbox
-            _RefusalOption(),
-
-            const SizedBox(height: 24),
-
-            PremiumButton(
-              label: 'Valider l\'interpellation',
-              icon: Icons.check_circle_outline_rounded,
-              onPressed: _hasSignature ? () => context.push('/police/confirmation') : null,
-            ).animate().fadeIn(delay: 400.ms),
+            // ── Bouton principal ──────────────────────────────────
+            if (_refusedToSign)
+              PremiumButton(
+                label: 'Procéder à la saisie des documents',
+                icon: Icons.folder_open_outlined,
+                onPressed: () => context.push('/police/refusal'),
+              ).animate().fadeIn()
+            else
+              PremiumButton(
+                label: 'Valider l\'interpellation',
+                icon: Icons.check_circle_outline_rounded,
+                onPressed: _hasSignature
+                    ? () => context.push('/police/confirmation')
+                    : null,
+              ).animate().fadeIn(delay: 400.ms),
 
             const SizedBox(height: 32),
           ],
@@ -172,7 +196,8 @@ class _SignatureScreenState extends State<SignatureScreen> {
     );
   }
 
-  Widget _buildSummary() {
+  Widget _buildSummary(InterpellationState s) {
+    final total = s.totalAmount;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -180,29 +205,44 @@ class _SignatureScreenState extends State<SignatureScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.cardBorder),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          _SummaryRow(label: 'Conducteur', value: 'Thierry Nguesso'),
-          Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(label: 'Véhicule', value: 'Toyota Corolla — BZV-4521-A'),
-          Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(label: 'Infractions', value: '2 infractions'),
-          Divider(height: 16, color: AppColors.divider),
+          _SummaryRow(
+              label: 'Conducteur',
+              value: s.driverName.isNotEmpty ? s.driverName : '—'),
+          const Divider(height: 16, color: AppColors.divider),
+          _SummaryRow(
+            label: 'Véhicule',
+            value: s.vehiclePlate.isNotEmpty
+                ? '${s.vehicleBrand} — ${s.vehiclePlate}'
+                : '—',
+          ),
+          const Divider(height: 16, color: AppColors.divider),
+          _SummaryRow(
+            label: 'Lieu',
+            value: s.lieuPrecis.isNotEmpty
+                ? s.lieuPrecis
+                : s.departement?.label ?? '—',
+          ),
+          const Divider(height: 16, color: AppColors.divider),
+          _SummaryRow(
+              label: 'Infractions',
+              value:
+                  '${s.selectedInfractions.length} infraction${s.selectedInfractions.length > 1 ? 's' : ''}'),
+          const Divider(height: 16, color: AppColors.divider),
           _SummaryRow(
             label: 'Montant',
-            value: '50 000 FCFA',
+            value: '${_fmt(total)} FCFA',
             valueColor: AppColors.primary,
           ),
-          Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(label: 'Référence', value: 'CP-2024-002847'),
         ],
       ),
     ).animate().fadeIn(delay: 100.ms);
   }
 
-  Widget _buildSignaturePad(String type) {
+  Widget _buildSignaturePadFixed() {
     return Container(
-      height: 80,
+      height: 64,
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
@@ -233,30 +273,31 @@ class _SignatureScreenState extends State<SignatureScreen> {
         color: const Color(0xFF0A1020),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _hasSignature ? AppColors.primary.withValues(alpha: 0.5) : AppColors.cardBorder,
+          color: _hasSignature
+              ? AppColors.primary.withValues(alpha: 0.5)
+              : AppColors.cardBorder,
         ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Grid hint
             if (!_hasSignature)
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.draw_outlined, size: 28, color: AppColors.textDisabled),
+                    const Icon(Icons.draw_outlined,
+                        size: 28, color: AppColors.textDisabled),
                     const SizedBox(height: 8),
                     Text(
                       'Signez ici',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textDisabled),
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textDisabled),
                     ),
                   ],
                 ),
               ),
-
-            // Signature canvas
             GestureDetector(
               onPanStart: _onPanStart,
               onPanUpdate: _onPanUpdate,
@@ -274,54 +315,25 @@ class _SignatureScreenState extends State<SignatureScreen> {
       ),
     );
   }
-}
 
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? valueColor;
-  const _SummaryRow({required this.label, required this.value, this.valueColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(flex: 2, child: Text(label, style: AppTextStyles.bodySmall)),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: valueColor ?? AppColors.textPrimary,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RefusalOption extends StatefulWidget {
-  @override
-  State<_RefusalOption> createState() => _RefusalOptionState();
-}
-
-class _RefusalOptionState extends State<_RefusalOption> {
-  bool _refusedToSign = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildRefusalOption() {
     return GestureDetector(
-      onTap: () => setState(() => _refusedToSign = !_refusedToSign),
-      child: Container(
+      onTap: () => setState(() {
+        _refusedToSign = !_refusedToSign;
+        if (_refusedToSign) _clearSignature();
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: _refusedToSign ? AppColors.error.withValues(alpha: 0.1) : AppColors.surfaceVariant,
+          color: _refusedToSign
+              ? AppColors.error.withValues(alpha: 0.1)
+              : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _refusedToSign ? AppColors.error.withValues(alpha: 0.4) : AppColors.cardBorder,
+            color: _refusedToSign
+                ? AppColors.error.withValues(alpha: 0.4)
+                : AppColors.cardBorder,
           ),
         ),
         child: Row(
@@ -334,25 +346,80 @@ class _RefusalOptionState extends State<_RefusalOption> {
                 color: _refusedToSign ? AppColors.error : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _refusedToSign ? AppColors.error : AppColors.textTertiary,
+                  color: _refusedToSign
+                      ? AppColors.error
+                      : AppColors.textTertiary,
                 ),
               ),
               child: _refusedToSign
-                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                  ? const Icon(Icons.check_rounded,
+                      size: 14, color: Colors.white)
                   : null,
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                'Le conducteur refuse de signer (enregistré)',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: _refusedToSign ? AppColors.error : AppColors.textSecondary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Le conducteur refuse de signer',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: _refusedToSign
+                          ? AppColors.error
+                          : AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (_refusedToSign) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '→ Saisie de documents + convocation automatique',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.error),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  String _fmt(int amount) {
+    if (amount < 1000) return amount.toString();
+    final thousands = amount ~/ 1000;
+    final remainder = amount % 1000;
+    if (remainder == 0) return '$thousands 000';
+    return '$thousands ${remainder.toString().padLeft(3, '0')}';
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+  const _SummaryRow({required this.label, required this.value, this.valueColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+            flex: 2, child: Text(label, style: AppTextStyles.bodySmall)),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: valueColor ?? AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
     );
   }
 }

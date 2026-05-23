@@ -330,7 +330,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Enregistre le token FCM reçu de firebase_messaging.
+  /// À appeler après que le plugin firebase_messaging fournit le token.
+  /// Ex: FirebaseMessaging.instance.getToken().then((t) => auth.notifier.registerFcmToken(t))
+  Future<void> registerFcmToken(String? token) async {
+    try {
+      await _repo.updateFcmToken(token);
+    } catch (_) {
+      // Non bloquant : la notification push fonctionnera
+      // quand le token sera enregistré à la prochaine session.
+    }
+  }
+
   Future<void> logout() async {
+    // Révoquer le token FCM avant la déconnexion (bonnes pratiques)
+    try { await _repo.updateFcmToken(null); } catch (_) {}
     await _repo.logout();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.prefUserRole);

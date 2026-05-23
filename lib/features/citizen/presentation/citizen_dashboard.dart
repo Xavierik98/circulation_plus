@@ -17,6 +17,8 @@ class CitizenDashboard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final finesAsync = ref.watch(myFinesProvider);
     final auth = ref.watch(authProvider);
+    final unreadCount =
+        ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -46,7 +48,7 @@ class CitizenDashboard extends ConsumerWidget {
             final totalDebt = pending.fold<int>(0, (s, f) => s + f.amount);
             return CustomScrollView(
               slivers: [
-                _buildAppBar(context),
+                _buildAppBar(context, unreadCount),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverList(
@@ -71,7 +73,7 @@ class CitizenDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(BuildContext context, int unreadCount) {
     return SliverAppBar(
       pinned: true,
       backgroundColor: AppColors.surface,
@@ -120,16 +122,23 @@ class CitizenDashboard extends ConsumerWidget {
                   ),
                   child: const Icon(Icons.notifications_outlined, size: 20, color: AppColors.textSecondary),
                 ),
-                Positioned(
-                  top: -2, right: -2,
-                  child: Container(
-                    width: 14, height: 14,
-                    decoration: BoxDecoration(
-                      color: AppColors.error, shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 2),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: -2, right: -2,
+                    child: Container(
+                      width: 14, height: 14,
+                      decoration: BoxDecoration(
+                        color: AppColors.error, shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
+                        ),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -447,7 +456,9 @@ class _PaidFineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/citizen/receipt/${fine.id}'),
+      onTap: fine.paymentId != null
+          ? () => context.push('/citizen/receipt/${fine.paymentId}')
+          : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(

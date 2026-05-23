@@ -131,6 +131,11 @@ class AuthRepository {
   }
 
   Future<bool> hasSession() => _api.hasAccessToken();
+
+  /// Enregistre (ou révoque si null) le token FCM pour les notifications push.
+  Future<void> updateFcmToken(String? token) async {
+    await _api.put('/api/auth/fcm-token', body: {'token': token});
+  }
 }
 
 class InfractionRepository {

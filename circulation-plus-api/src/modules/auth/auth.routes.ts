@@ -12,7 +12,7 @@ import {
   changePasswordSchema,
   resendVerificationSchema,
 } from './auth.schema';
-import { login, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification, updateProfile, uploadProfilePhoto, forgotPassword, resetPassword } from './auth.service';
+import { login, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification, updateProfile, uploadProfilePhoto, forgotPassword, resetPassword, registerFcmToken, revokeFcmToken } from './auth.service';
 
 // ── Page HTML retournée après clic sur le lien de vérification ────────────────
 type VerifyResult = 'success' | 'expired' | 'invalid';
@@ -352,6 +352,34 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const { imageBase64, mimeType } = request.body as { imageBase64: string; mimeType: string };
       return ok(await uploadProfilePhoto(request.user!.id, imageBase64, mimeType, app.adapters));
+    },
+  );
+
+  // PUT /api/auth/fcm-token — authentifié, enregistre le token FCM pour les push notifications.
+  r.put(
+    '/fcm-token',
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ['Auth'],
+        summary: 'Enregistrer ou révoquer le token FCM',
+        description:
+          'Rôles autorisés : tous (authentifié). '
+          + 'Envoie { token: string } pour enregistrer, { token: null } pour révoquer.',
+        security: [{ bearerAuth: [] }],
+        body: z.object({
+          token: z.string().min(10).nullable(),
+        }),
+      },
+    },
+    async (request) => {
+      const { token } = request.body as { token: string | null };
+      if (token) {
+        await registerFcmToken(request.user!.id, token);
+      } else {
+        await revokeFcmToken(request.user!.id);
+      }
+      return ok({ updated: true });
     },
   );
 

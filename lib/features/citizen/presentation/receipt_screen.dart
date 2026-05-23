@@ -1,20 +1,193 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/widgets/premium_button.dart';
 import '../../../data/providers.dart';
+import '../../../data/repositories.dart';
 
-class ReceiptScreen extends ConsumerWidget {
+class ReceiptScreen extends ConsumerStatefulWidget {
   /// En pratique il s'agit d'un paymentId (le router utilise le même paramètre `:id`).
   final String fineId;
   const ReceiptScreen({super.key, required this.fineId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final receiptAsync = ref.watch(receiptProvider(fineId));
+  ConsumerState<ReceiptScreen> createState() => _ReceiptScreenState();
+}
+
+class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
+  bool _pdfLoading = false;
+  Map<String, dynamic>? _loadedReceipt;
+
+  // ── Génère un PDF du reçu ──────────────────────────────────────────────────
+  Future<Uint8List> _generatePdf(Map<String, dynamic> receipt) async {
+    final fine = receipt['fine'] as Map<String, dynamic>?;
+    final fineRef = fine?['reference'] as String? ?? '—';
+    final driverName = fine?['driverName'] as String?
+        ?? ((fine?['driver'] as Map?)?.let((d) =>
+            '${d['prenom'] ?? ''} ${d['nom'] ?? ''}'.trim()) ?? '—');
+    final plate = (fine?['vehicle'] as Map?)?['plaque'] as String?
+        ?? fine?['vehiclePlate'] as String? ?? '—';
+    final infractionLabel =
+        ((fine?['infractionType'] as Map?)?['libelle'] as String?)
+        ?? fine?['infractionLabel'] as String? ?? '—';
+    final mode = receipt['mode'] as String? ?? receipt['operateur'] as String? ?? 'Mobile Money';
+    final modeLabel = switch (mode) {
+      'TRESOR_PUBLIC' => 'Trésor Public',
+      'MTN' => 'MTN Mobile Money',
+      'AIRTEL' => 'Airtel Money',
+      _ => mode,
+    };
+    final quittance = receipt['quittanceNumero'] as String?;
+    final txId = receipt['transactionId'] as String?;
+    final paymentRef = quittance ?? txId ?? receipt['id'] as String? ?? '—';
+    final montant = (receipt['montantTotal'] as num?)?.toInt() ?? 0;
+    final confirmedAt = receipt['confirmedAt'] as String?;
+    final paidDate = confirmedAt != null ? DateTime.tryParse(confirmedAt) : null;
+    final paidStr = paidDate != null
+        ? '${paidDate.day.toString().padLeft(2,'0')}/${paidDate.month.toString().padLeft(2,'0')}/${paidDate.year}'
+        : DateTime.now().toString().substring(0, 10);
+
+    final doc = pw.Document(title: 'Reçu $fineRef');
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Center(
+              child: pw.Text(
+                'REÇU DE PAIEMENT',
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+            pw.Center(
+              child: pw.Text(
+                'République du Congo — Ministère de l\'Intérieur — DGST',
+                style: const pw.TextStyle(fontSize: 10),
+              ),
+            ),
+            pw.SizedBox(height: 24),
+            pw.Divider(),
+            pw.SizedBox(height: 12),
+            _pdfRow('Référence PV', fineRef),
+            _pdfRow('Conducteur', driverName),
+            _pdfRow('Plaque', plate),
+            _pdfRow('Infraction', infractionLabel),
+            pw.SizedBox(height: 12),
+            pw.Divider(),
+            pw.SizedBox(height: 12),
+            _pdfRow('Mode de paiement', modeLabel),
+            _pdfRow(quittance != null ? 'N° Quittance' : 'Réf. transaction', paymentRef),
+            _pdfRow('Date de paiement', paidStr),
+            pw.SizedBox(height: 16),
+            pw.Divider(thickness: 2),
+            pw.SizedBox(height: 12),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('MONTANT TOTAL',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                pw.Text('$montant XAF',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            pw.SizedBox(height: 24),
+            pw.Divider(),
+            pw.SizedBox(height: 8),
+            pw.Center(
+              child: pw.Text(
+                'Document authentique — DGST Congo',
+                style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return doc.save();
+  }
+
+  pw.Widget _pdfRow(String label, String value) => pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 4),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.SizedBox(
+          width: 160,
+          child: pw.Text(label,
+              style: const pw.TextStyle(color: PdfColors.grey700, fontSize: 10)),
+        ),
+        pw.Expanded(
+          child: pw.Text(value,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _downloadPdf(Map<String, dynamic> receipt) async {
+    final fineData = receipt['fine'] as Map<String, dynamic>?;
+    final fineId = fineData?['id'] as String?;
+    if (fineId == null) {
+      _snack('Identifiant du PV introuvable');
+      return;
+    }
+    setState(() => _pdfLoading = true);
+    try {
+      final url = await FineRepository().pdfUrl(fineId);
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _snack('Impossible d\'ouvrir le PDF');
+      }
+    } catch (e) {
+      _snack('Erreur : $e');
+    } finally {
+      if (mounted) setState(() => _pdfLoading = false);
+    }
+  }
+
+  Future<void> _printReceipt(Map<String, dynamic> receipt) async {
+    try {
+      final bytes = await _generatePdf(receipt);
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+    } catch (e) {
+      if (mounted) _snack('Impossible d\'imprimer : $e');
+    }
+  }
+
+  Future<void> _shareReceipt(Map<String, dynamic> receipt) async {
+    try {
+      final fine = receipt['fine'] as Map<String, dynamic>?;
+      final ref_ = fine?['reference'] as String? ?? 'recu';
+      final bytes = await _generatePdf(receipt);
+      await Printing.sharePdf(bytes: bytes, filename: 'recu-$ref_.pdf');
+    } catch (e) {
+      if (mounted) _snack('Impossible de partager : $e');
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppColors.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final receiptAsync = ref.watch(receiptProvider(widget.fineId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -50,10 +223,11 @@ class ReceiptScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined, size: 20),
-            onPressed: () {},
-          ),
+          if (_loadedReceipt != null)
+            IconButton(
+              icon: const Icon(Icons.share_outlined, size: 20),
+              onPressed: () => _shareReceipt(_loadedReceipt!),
+            ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
@@ -95,18 +269,25 @@ class ReceiptScreen extends ConsumerWidget {
             ),
           ),
         ),
-        data: (receipt) => SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              _buildReceiptCard(receipt),
-              const SizedBox(height: 20),
-              _buildActions(context),
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
+        data: (receipt) {
+          // Cache receipt for share button in appBar
+          if (_loadedReceipt == null) {
+            WidgetsBinding.instance.addPostFrameCallback(
+                (_) => setState(() => _loadedReceipt = receipt));
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                _buildReceiptCard(receipt),
+                const SizedBox(height: 20),
+                _buildActions(context, receipt),
+                const SizedBox(height: 32),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -347,21 +528,22 @@ class ReceiptScreen extends ConsumerWidget {
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1);
   }
 
-  Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context, Map<String, dynamic> receipt) {
     return Column(
       children: [
         PremiumButton(
-          label: 'Télécharger le PDF',
+          label: _pdfLoading ? 'Génération du PDF...' : 'Télécharger le PDF',
           icon: Icons.download_rounded,
           gradient: AppColors.successGradient,
-          onPressed: () {},
+          isLoading: _pdfLoading,
+          onPressed: _pdfLoading ? null : () => _downloadPdf(receipt),
         ).animate().fadeIn(delay: 300.ms),
         const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () {},
+                onTap: () => _printReceipt(receipt),
                 child: Container(
                   height: 52,
                   decoration: BoxDecoration(
@@ -386,7 +568,7 @@ class ReceiptScreen extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: GestureDetector(
-                onTap: () {},
+                onTap: () => _shareReceipt(receipt),
                 child: Container(
                   height: 52,
                   decoration: BoxDecoration(
@@ -436,6 +618,10 @@ class ReceiptScreen extends ConsumerWidget {
     }
     return amount.toString();
   }
+}
+
+extension _LetExt<T> on T {
+  R let<R>(R Function(T it) block) => block(this);
 }
 
 class _RepartRow extends StatelessWidget {

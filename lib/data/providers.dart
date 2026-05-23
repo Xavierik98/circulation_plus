@@ -82,6 +82,15 @@ final heatmapProvider = FutureProvider.autoDispose<List<dynamic>>((ref) {
   return ref.read(statsRepositoryProvider).heatmap();
 });
 
+/// Nombre de notifications non lues (pour le badge).
+final unreadNotificationsCountProvider =
+    FutureProvider.autoDispose<int>((ref) async {
+  final page = await ref
+      .read(notificationRepositoryProvider)
+      .list(limit: 1, unreadOnly: true);
+  return page.total;
+});
+
 /// Infractions sélectionnées pendant le flux d'interpellation.
 /// Partagé entre InfractionSelectionScreen → FineCalculationScreen.
 final selectedInfractionsProvider =

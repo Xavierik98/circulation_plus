@@ -485,6 +485,22 @@ export async function forgotPassword(email: string): Promise<void> {
   }
 }
 
+// Enregistrement du token FCM pour les notifications push.
+export async function registerFcmToken(userId: string, fcmToken: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { fcmToken },
+  });
+}
+
+// Révocation du token FCM (déconnexion ou refus de notifs).
+export async function revokeFcmToken(userId: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { fcmToken: null },
+  });
+}
+
 // Étape 2 : valide le token, change le mot de passe.
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
   const userId = await redis.get(resetKey(token));

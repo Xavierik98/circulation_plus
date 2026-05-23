@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../../../theme/app_text_styles.dart';
 import '../../../../shared/models/interpellation_state.dart';
 import '../../../../shared/widgets/premium_button.dart';
 import '../../../../shared/widgets/glass_card.dart';
+import '../../../../data/repositories.dart';
 
 /// Écran de saisie/vérification des données du conducteur après scan.
 /// Permis congolais (RC) — PAS de système de points.
@@ -41,6 +43,7 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
   bool _sansDocument  = false; // Le conducteur n'a AUCUN document
 
   bool _isConfirming = false;
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -79,6 +82,68 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
         _hasControle   = false;
       }
     });
+  }
+
+  /// Recherche le conducteur + véhicule par numéro de plaque dans la BD.
+  Future<void> _searchByPlate() async {
+    final plate = _plateCtrl.text.trim().toUpperCase();
+    if (plate.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Saisissez d\'abord le numéro de plaque'),
+        backgroundColor: AppColors.warning,
+      ));
+      return;
+    }
+    setState(() => _isSearching = true);
+    try {
+      final result = await DriverRepository().search(plate: plate);
+      if (!mounted) return;
+
+      // Résultats du backend : { driver: {...}, vehicle: {...}, fines: [...] }
+      final driver = result['driver'] as Map<String, dynamic>?;
+      final vehicle = result['vehicle'] as Map<String, dynamic>?;
+
+      if (driver == null && vehicle == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Aucun conducteur trouvé pour cette plaque'),
+          backgroundColor: AppColors.warning,
+        ));
+        return;
+      }
+
+      setState(() {
+        if (driver != null) {
+          final prenom = driver['prenom'] as String? ?? '';
+          final nom = driver['nom'] as String? ?? '';
+          _nameCtrl.text = '$prenom $nom'.trim();
+          _licCtrl.text = driver['numeroPermis'] as String? ?? _licCtrl.text;
+          _phoneCtrl.text = driver['telephone'] as String? ?? _phoneCtrl.text;
+        }
+        if (vehicle != null) {
+          _brandCtrl.text = vehicle['marque'] as String? ?? _brandCtrl.text;
+          _modelCtrl.text = vehicle['modele'] as String? ?? _modelCtrl.text;
+          _colorCtrl.text = vehicle['couleur'] as String? ?? _colorCtrl.text;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Row(children: [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+          SizedBox(width: 8),
+          Text('Informations pré-remplies depuis la base de données'),
+        ]),
+        backgroundColor: AppColors.success,
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Plaque non trouvée en base — saisissez manuellement'),
+          backgroundColor: AppColors.textTertiary,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
   }
 
   Future<void> _confirm() async {
@@ -152,6 +217,46 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
+
+              // Photo du document (si capturée)
+              Builder(builder: (ctx) {
+                final scanPath =
+                    ref.watch(interpellationProvider).scanImagePath;
+                if (scanPath == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          File(scanPath),
+                          width: 100,
+                          height: 65,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Document scanné',
+                                style: AppTextStyles.labelSmall
+                                    .copyWith(color: AppColors.success)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Vérifiez et complétez les champs ci-dessous en vous basant sur le document.',
+                              style: AppTextStyles.caption
+                                  .copyWith(color: AppColors.textTertiary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn();
+              }),
 
               // Bandeau RC
               Container(
@@ -309,6 +414,35 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
                       hint: 'Ex : BZV-1234-A',
                       icon: Icons.confirmation_number_outlined,
                       caps: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isSearching ? null : _searchByPlate,
+                        icon: _isSearching
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: AppColors.primary))
+                            : const Icon(Icons.search_rounded,
+                                size: 16, color: AppColors.primary),
+                        label: Text(
+                          _isSearching
+                              ? 'Recherche en cours...'
+                              : 'Rechercher conducteur en base',
+                          style: AppTextStyles.labelSmall
+                              .copyWith(color: AppColors.primary),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                              color: AppColors.primary.withValues(alpha: 0.4)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(

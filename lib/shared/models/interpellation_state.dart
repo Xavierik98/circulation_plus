@@ -56,6 +56,10 @@ class InterpellationState {
   // ── Infractions ───────────────────────────────────────────
   final List<InfractionType> selectedInfractions;
 
+  // ── Scan image ────────────────────────────────────────────
+  /// Chemin local vers la photo du document scanné (permis / carte grise).
+  final String? scanImagePath;
+
   // ── Signature ─────────────────────────────────────────────
   final bool signatureRefused;
   final List<DocumentSaisi> documentsSeizes;
@@ -77,6 +81,7 @@ class InterpellationState {
     this.gpsLat,
     this.gpsLng,
     this.selectedInfractions = const [],
+    this.scanImagePath,
     this.signatureRefused = false,
     this.documentsSeizes = const [],
   });
@@ -98,6 +103,7 @@ class InterpellationState {
     double? gpsLat,
     double? gpsLng,
     List<InfractionType>? selectedInfractions,
+    String? scanImagePath,
     bool? signatureRefused,
     List<DocumentSaisi>? documentsSeizes,
   }) {
@@ -118,6 +124,7 @@ class InterpellationState {
       gpsLat: gpsLat ?? this.gpsLat,
       gpsLng: gpsLng ?? this.gpsLng,
       selectedInfractions: selectedInfractions ?? this.selectedInfractions,
+      scanImagePath: scanImagePath ?? this.scanImagePath,
       signatureRefused: signatureRefused ?? this.signatureRefused,
       documentsSeizes: documentsSeizes ?? this.documentsSeizes,
     );
@@ -212,6 +219,10 @@ class InterpellationNotifier extends StateNotifier<InterpellationState> {
 
   void setInfractions(List<InfractionType> infractions) {
     state = state.copyWith(selectedInfractions: infractions);
+  }
+
+  void setScanImage(String? path) {
+    state = state.copyWith(scanImagePath: path);
   }
 
   void setSignatureRefused({

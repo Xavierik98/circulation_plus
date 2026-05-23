@@ -15,6 +15,7 @@ import '../../../data/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../data/providers.dart';
+import '../../../shared/models/fine_model.dart';
 
 String _firstName(String? fullName) {
   if (fullName == null || fullName.trim().isEmpty) return 'Agent';
@@ -113,6 +114,8 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final statsAsync = ref.watch(officerStatsProvider);
+    final recentFinesAsync = ref.watch(myFinesProvider);
+    final unreadCount = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
 
     final stats = statsAsync.valueOrNull;
     final officer = OfficerModel(
@@ -135,7 +138,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          _buildAppBar(officer, _onDuty),
+          _buildAppBar(officer, _onDuty, unreadCount),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
@@ -147,7 +150,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
                 const SizedBox(height: 24),
                 _buildQuickActions(),
                 const SizedBox(height: 24),
-                _buildActivityFeed(),
+                _buildActivityFeed(recentFinesAsync.valueOrNull ?? []),
                 const SizedBox(height: 24),
                 _buildStatusIndicators(),
                 const SizedBox(height: 100),
@@ -159,7 +162,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     );
   }
 
-  Widget _buildAppBar(OfficerModel officer, bool onDuty) {
+  Widget _buildAppBar(OfficerModel officer, bool onDuty, int unreadCount) {
     return SliverAppBar(
       pinned: true,
       floating: false,
@@ -259,19 +262,30 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
                   child: const Icon(Icons.notifications_outlined,
                       size: 20, color: AppColors.textSecondary),
                 ),
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 2),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -532,7 +546,8 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     );
   }
 
-  Widget _buildActivityFeed() {
+  Widget _buildActivityFeed(List<FineModel> fines) {
+    final recent = fines.take(5).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -550,25 +565,85 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
           ],
         ),
         const SizedBox(height: 12),
-        PremiumCard(
-          child: Column(
-            children: [
-              const Icon(Icons.history_rounded,
-                  size: 36, color: AppColors.textDisabled),
-              const SizedBox(height: 10),
-              Text(
-                'Aucune activité pour le moment',
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textTertiary),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Vos verbalisations apparaîtront ici.',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-        ).animate().fadeIn(delay: 400.ms),
+        if (recent.isEmpty)
+          PremiumCard(
+            child: Column(
+              children: [
+                const Icon(Icons.history_rounded,
+                    size: 36, color: AppColors.textDisabled),
+                const SizedBox(height: 10),
+                Text(
+                  'Aucune activité pour le moment',
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textTertiary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Vos verbalisations apparaîtront ici.',
+                  style: AppTextStyles.bodySmall,
+                ),
+              ],
+            ),
+          ).animate().fadeIn(delay: 400.ms)
+        else
+          ...recent.asMap().entries.map((e) {
+            final fine = e.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: PremiumCard(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.gavel_rounded,
+                          size: 18, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fine.infractionLabel,
+                            style: AppTextStyles.bodyMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${fine.vehiclePlate} · ${fine.issuedAt.day}/${fine.issuedAt.month}/${fine.issuedAt.year}',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        StatusBadge.fromFineStatus(fine.status),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${(fine.amount / 1000).toStringAsFixed(0)}K',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ).animate(delay: Duration(milliseconds: 400 + e.key * 80))
+                  .fadeIn(duration: 300.ms)
+                  .slideX(begin: 0.05, end: 0),
+            );
+          }),
       ],
     );
   }

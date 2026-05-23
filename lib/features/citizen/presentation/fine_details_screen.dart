@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,10 +35,28 @@ class FineDetailsScreen extends ConsumerWidget {
         ),
         title: Text('Détail de l\'amende', style: AppTextStyles.titleSmall),
         actions: [
-          IconButton(
+          asyncFine.whenData((fine) => IconButton(
             icon: const Icon(Icons.share_outlined, size: 20),
-            onPressed: () {},
-          ),
+            onPressed: () async {
+              final text =
+                  'Circulation+ — PNC\n'
+                  'Amende : ${fine.reference}\n'
+                  'Infraction : ${fine.infractionLabel}\n'
+                  'Plaque : ${fine.vehiclePlate}\n'
+                  'Montant : ${(fine.amount / 1000).toStringAsFixed(0)} 000 FCFA\n'
+                  'Échéance : ${fine.deadline.day}/${fine.deadline.month}/${fine.deadline.year}\n'
+                  'Statut : ${fine.status.name.toUpperCase()}';
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Résumé copié dans le presse-papier'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          )).valueOrNull ?? const SizedBox.shrink(),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),

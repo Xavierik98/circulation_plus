@@ -37,6 +37,8 @@ class AdminDashboard extends ConsumerWidget {
                 _buildGlobalRates(stats),
                 const SizedBox(height: 24),
                 _buildTopOfficers(context),
+                const SizedBox(height: 24),
+                _buildQuickLinks(context),
                 const SizedBox(height: 100),
               ]),
             ),
@@ -407,6 +409,122 @@ class AdminDashboard extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         _TopOfficersList(),
+      ],
+    );
+  }
+
+  Widget _buildQuickLinks(BuildContext context) {
+    final links = [
+      (
+        icon: Icons.receipt_long_rounded,
+        label: 'Toutes les amendes',
+        subtitle: 'Consulter & filtrer',
+        gradient: AppColors.primaryGradient,
+        route: '/admin/fines',
+      ),
+      (
+        icon: Icons.person_add_alt_1_rounded,
+        label: 'Ajouter un agent',
+        subtitle: 'Enregistrement PNC',
+        gradient: AppColors.successGradient,
+        route: '/admin/add-agent',
+      ),
+      (
+        icon: Icons.map_rounded,
+        label: 'Carte nationale',
+        subtitle: 'Zones & agents',
+        gradient: const LinearGradient(
+          colors: [AppColors.info, Color(0xFF0097A7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        route: '/admin/map',
+      ),
+      (
+        icon: Icons.bar_chart_rounded,
+        label: 'Revenus détaillés',
+        subtitle: 'Analyse financière',
+        gradient: const LinearGradient(
+          colors: [AppColors.accent, AppColors.gold],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        route: '/admin/revenue',
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Accès rapides', style: AppTextStyles.titleMedium),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          childAspectRatio: 1.8,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: links.asMap().entries.map((entry) {
+            final i = entry.key;
+            final link = entry.value;
+            return GestureDetector(
+              onTap: () => context.push(link.route),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: link.gradient,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(link.icon, size: 18, color: Colors.white),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          link.label,
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          link.subtitle,
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )
+                .animate(delay: Duration(milliseconds: i * 60))
+                .fadeIn(duration: 300.ms)
+                .slideY(begin: 0.06, end: 0);
+          }).toList(),
+        ),
       ],
     );
   }

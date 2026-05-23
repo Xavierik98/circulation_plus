@@ -32,6 +32,7 @@ import '../features/admin/presentation/map_screen.dart';
 import '../features/admin/presentation/officers_management_screen.dart';
 import '../features/admin/presentation/revenue_dashboard.dart';
 import '../features/admin/presentation/register_agent_screen.dart';
+import '../features/admin/presentation/fines_management_screen.dart';
 import '../features/auth/presentation/change_password_screen.dart';
 import '../features/auth/presentation/verify_email_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
@@ -229,6 +230,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/admin/revenue', builder: (_, __) => const RevenueDashboard()),
         ],
+      ),
+      GoRoute(
+        path: '/admin/fines',
+        builder: (_, __) => const FinesManagementScreen(),
       ),
       GoRoute(
         path: '/admin/add-agent',

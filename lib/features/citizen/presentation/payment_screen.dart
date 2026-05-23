@@ -9,6 +9,7 @@ import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/premium_button.dart';
 import '../../../data/repositories.dart';
 import '../../../data/api_client.dart';
+import '../../../data/providers.dart';
 import '../../auth/providers/auth_provider.dart';
 
 // ─── Provider local pour la méthode sélectionnée ─────────────────────────────
@@ -207,12 +208,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
   @override
   Widget build(BuildContext context) {
-    final fine = FineModel.mockFines.firstWhere(
-      (f) => f.id == widget.fineId,
-      orElse: () => FineModel.mockFines.first,
-    );
+    final asyncFine = ref.watch(fineDetailProvider(widget.fineId));
     final method = ref.watch(_selectedMethodProvider);
-    final auth = ref.watch(authProvider);
 
     if (_paymentSuccess) return _buildSuccessScreen();
 
@@ -249,7 +246,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                   const BoxDecoration(gradient: AppColors.congoFlagGradient)),
         ),
       ),
-      body: SingleChildScrollView(
+      body: asyncFine.when(
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary)),
+        error: (e, _) => Center(
+          child: Text('Impossible de charger l\'amende : $e',
+              style: AppTextStyles.bodyMedium,
+              textAlign: TextAlign.center),
+        ),
+        data: (fine) => _buildPaymentBody(context, fine, method),
+      ),
+    );
+  }
+
+  Widget _buildPaymentBody(
+      BuildContext context, FineModel fine, String method) {
+    final userName = ref.read(authProvider).userName ?? '';
+    return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +336,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             if (method == 'mtn' || method == 'airtel')
               _buildMobileMoneyForm(method)
             else
-              _buildTresorForm(auth.userName ?? ''),
+              _buildTresorForm(userName),
 
             const SizedBox(height: 20),
 
@@ -381,7 +394,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             const SizedBox(height: 32),
           ],
         ),
-      ),
     );
   }
 

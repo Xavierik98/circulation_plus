@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
@@ -7,17 +8,15 @@ import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/premium_button.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../../../data/providers.dart';
 
-class FineDetailsScreen extends StatelessWidget {
+class FineDetailsScreen extends ConsumerWidget {
   final String fineId;
   const FineDetailsScreen({super.key, required this.fineId});
 
   @override
-  Widget build(BuildContext context) {
-    final fine = FineModel.mockFines.firstWhere(
-      (f) => f.id == fineId,
-      orElse: () => FineModel.mockFines.first,
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncFine = ref.watch(fineDetailProvider(fineId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -27,7 +26,9 @@ class FineDetailsScreen extends StatelessWidget {
           onTap: () => context.pop(),
           child: Container(
             margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(10)),
             child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
           ),
         ),
@@ -40,82 +41,153 @@ class FineDetailsScreen extends StatelessWidget {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
-          child: Container(height: 3, decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
+          child: Container(
+              height: 3,
+              decoration:
+                  const BoxDecoration(gradient: AppColors.congoFlagGradient)),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header hero
-            _buildHeroCard(fine),
-            const SizedBox(height: 20),
-
-            // Infraction details
-            _buildSection('Infraction', [
-              _DetailRow(label: 'Type', value: fine.infractionLabel),
-              _DetailRow(label: 'Code', value: fine.infractionCode),
-              _DetailRow(label: 'Référence', value: fine.reference, isMono: true),
-              _DetailRow(label: 'Date', value: '${fine.issuedAt.day}/${fine.issuedAt.month}/${fine.issuedAt.year}'),
-              _DetailRow(label: 'Heure', value: '${fine.issuedAt.hour}:${fine.issuedAt.minute.toString().padLeft(2,'0')}'),
-            ]),
-
-            const SizedBox(height: 16),
-
-            // Officer info
-            _buildSection('Agent verbalisateur', [
-              _DetailRow(label: 'Nom', value: fine.officerName),
-              _DetailRow(label: 'Matricule', value: fine.officerBadge, isMono: true),
-            ]),
-
-            const SizedBox(height: 16),
-
-            // Vehicle info
-            _buildSection('Véhicule', [
-              _DetailRow(label: 'Plaque', value: fine.vehiclePlate, isMono: true),
-              _DetailRow(label: 'Marque', value: fine.vehicleBrand),
-              _DetailRow(label: 'Propriétaire', value: fine.driverName),
-            ]),
-
-            const SizedBox(height: 16),
-
-            // Location mock map
-            _buildMapCard(fine),
-
-            const SizedBox(height: 16),
-
-            // Financial
-            _buildSection('Informations financières', [
-              _DetailRow(label: 'Montant', value: '${(fine.amount / 1000).toStringAsFixed(0)} 000 FCFA', valueColor: AppColors.primary),
-              _DetailRow(label: 'Majoration 50%', value: '+${(fine.amount * 0.5 / 1000).toStringAsFixed(0)} 000 FCFA (si retard)', valueColor: AppColors.warning),
-              _DetailRow(label: 'Échéance', value: '${fine.deadline.day}/${fine.deadline.month}/${fine.deadline.year}',
-                valueColor: fine.isOverdue ? AppColors.error : AppColors.textPrimary),
-              _DetailRow(label: 'Points retirés', value: '-${fine.pointsDeducted} point${fine.pointsDeducted > 1 ? 's' : ''}', valueColor: AppColors.error),
-            ]),
-
-            const SizedBox(height: 24),
-
-            if (fine.status == FineStatus.pending || fine.status == FineStatus.overdue) ...[
-              PremiumButton(
-                label: 'Payer maintenant',
-                icon: Icons.payment_rounded,
-                onPressed: () => context.push('/citizen/payment/${fine.id}'),
-              ).animate().fadeIn(delay: 400.ms),
-              const SizedBox(height: 12),
-              _ContestButton(fine: fine),
-            ] else if (fine.status == FineStatus.paid) ...[
-              PremiumButton(
-                label: 'Télécharger le reçu',
-                icon: Icons.download_rounded,
-                gradient: AppColors.successGradient,
-                onPressed: () => context.push('/citizen/receipt/${fine.id}'),
-              ).animate().fadeIn(),
-            ],
-
-            const SizedBox(height: 32),
-          ],
+      body: asyncFine.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 48, color: AppColors.error),
+                const SizedBox(height: 16),
+                Text('Impossible de charger l\'amende',
+                    style: AppTextStyles.titleSmall),
+                const SizedBox(height: 8),
+                Text(e.toString(),
+                    style: AppTextStyles.bodySmall, textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                PremiumButton(
+                  label: 'Réessayer',
+                  icon: Icons.refresh_rounded,
+                  onPressed: () =>
+                      ref.invalidate(fineDetailProvider(fineId)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        data: (fine) => _FineDetailsBody(fine: fine),
+      ),
+    );
+  }
+}
+
+class _FineDetailsBody extends StatelessWidget {
+  final FineModel fine;
+  const _FineDetailsBody({required this.fine});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header hero
+          _buildHeroCard(fine),
+          const SizedBox(height: 20),
+
+          // Infraction details
+          _buildSection('Infraction', [
+            _DetailRow(label: 'Type', value: fine.infractionLabel),
+            _DetailRow(label: 'Code', value: fine.infractionCode),
+            _DetailRow(
+                label: 'Référence', value: fine.reference, isMono: true),
+            _DetailRow(
+                label: 'Date',
+                value:
+                    '${fine.issuedAt.day}/${fine.issuedAt.month}/${fine.issuedAt.year}'),
+            _DetailRow(
+                label: 'Heure',
+                value:
+                    '${fine.issuedAt.hour}:${fine.issuedAt.minute.toString().padLeft(2, '0')}'),
+          ]),
+
+          const SizedBox(height: 16),
+
+          // Officer info
+          _buildSection('Agent verbalisateur', [
+            _DetailRow(label: 'Nom', value: fine.officerName),
+            _DetailRow(
+                label: 'Matricule',
+                value: fine.officerBadge,
+                isMono: true),
+          ]),
+
+          const SizedBox(height: 16),
+
+          // Vehicle info
+          _buildSection('Véhicule', [
+            _DetailRow(
+                label: 'Plaque', value: fine.vehiclePlate, isMono: true),
+            _DetailRow(label: 'Marque', value: fine.vehicleBrand),
+            _DetailRow(label: 'Propriétaire', value: fine.driverName),
+          ]),
+
+          const SizedBox(height: 16),
+
+          // Location mock map
+          _buildMapCard(fine),
+
+          const SizedBox(height: 16),
+
+          // Financial
+          _buildSection('Informations financières', [
+            _DetailRow(
+                label: 'Montant',
+                value:
+                    '${(fine.amount / 1000).toStringAsFixed(0)} 000 FCFA',
+                valueColor: AppColors.primary),
+            _DetailRow(
+                label: 'Majoration 50%',
+                value:
+                    '+${(fine.amount * 0.5 / 1000).toStringAsFixed(0)} 000 FCFA (si retard)',
+                valueColor: AppColors.warning),
+            _DetailRow(
+                label: 'Échéance',
+                value:
+                    '${fine.deadline.day}/${fine.deadline.month}/${fine.deadline.year}',
+                valueColor: fine.isOverdue
+                    ? AppColors.error
+                    : AppColors.textPrimary),
+          ]),
+
+          const SizedBox(height: 24),
+
+          if (fine.status == FineStatus.pending ||
+              fine.status == FineStatus.overdue) ...[
+            PremiumButton(
+              label: 'Payer maintenant',
+              icon: Icons.payment_rounded,
+              onPressed: () =>
+                  context.push('/citizen/payment/${fine.id}'),
+            ).animate().fadeIn(delay: 400.ms),
+            const SizedBox(height: 12),
+            _ContestButton(fine: fine),
+          ] else if (fine.status == FineStatus.paid) ...[
+            PremiumButton(
+              label: 'Voir le reçu',
+              icon: Icons.receipt_long_rounded,
+              gradient: AppColors.successGradient,
+              onPressed: () {
+                final target = fine.paymentId ?? fine.id;
+                context.push('/citizen/receipt/$target');
+              },
+            ).animate().fadeIn(),
+          ],
+
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }
@@ -135,7 +207,9 @@ class FineDetailsScreen extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isPaid ? AppColors.success.withValues(alpha: 0.3) : AppColors.warning.withValues(alpha: 0.3),
+          color: isPaid
+              ? AppColors.success.withValues(alpha: 0.3)
+              : AppColors.warning.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -146,12 +220,17 @@ class FineDetailsScreen extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: (isPaid ? AppColors.success : AppColors.warning).withValues(alpha: 0.15),
+                  color: (isPaid ? AppColors.success : AppColors.warning)
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: (isPaid ? AppColors.success : AppColors.warning).withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: (isPaid ? AppColors.success : AppColors.warning)
+                          .withValues(alpha: 0.3)),
                 ),
                 child: Icon(
-                  isPaid ? Icons.check_circle_rounded : Icons.gavel_rounded,
+                  isPaid
+                      ? Icons.check_circle_rounded
+                      : Icons.gavel_rounded,
                   color: isPaid ? AppColors.success : AppColors.warning,
                   size: 26,
                 ),
@@ -163,7 +242,8 @@ class FineDetailsScreen extends StatelessWidget {
                   children: [
                     Text(fine.infractionLabel,
                         style: AppTextStyles.titleSmall,
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 6),
                     StatusBadge.fromFineStatus(fine.status),
                   ],
@@ -191,12 +271,14 @@ class FineDetailsScreen extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(isPaid ? 'Payé le' : 'Échéance', style: AppTextStyles.caption),
+                  Text(isPaid ? 'Payé le' : 'Échéance',
+                      style: AppTextStyles.caption),
                   Text(
                     isPaid && fine.paidAt != null
                         ? '${fine.paidAt!.day}/${fine.paidAt!.month}/${fine.paidAt!.year}'
                         : '${fine.deadline.day}/${fine.deadline.month}/${fine.deadline.year}',
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
+                    style: AppTextStyles.bodyMedium
+                        .copyWith(color: AppColors.textPrimary),
                   ),
                 ],
               ),
@@ -212,17 +294,21 @@ class FineDetailsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTextStyles.titleSmall.copyWith(color: AppColors.textTertiary)),
+          Text(title,
+              style: AppTextStyles.titleSmall
+                  .copyWith(color: AppColors.textTertiary)),
           const SizedBox(height: 12),
           ...rows.asMap().entries.map((e) => Column(
-            children: [
-              e.value,
-              if (e.key < rows.length - 1) const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Divider(height: 1, color: AppColors.divider),
-              ),
-            ],
-          )),
+                children: [
+                  e.value,
+                  if (e.key < rows.length - 1)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child:
+                          Divider(height: 1, color: AppColors.divider),
+                    ),
+                ],
+              )),
         ],
       ),
     ).animate().fadeIn(delay: 150.ms);
@@ -239,7 +325,8 @@ class FineDetailsScreen extends StatelessWidget {
             height: 160,
             decoration: const BoxDecoration(
               color: Color(0xFF0D1928),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: CustomPaint(
               painter: _MockMapPainter(fine.latitude, fine.longitude),
@@ -254,10 +341,13 @@ class FineDetailsScreen extends StatelessWidget {
                         color: AppColors.error,
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: AppColors.error.withValues(alpha: 0.4), blurRadius: 12),
+                          BoxShadow(
+                              color: AppColors.error.withValues(alpha: 0.4),
+                              blurRadius: 12),
                         ],
                       ),
-                      child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 20),
+                      child: const Icon(Icons.location_on_rounded,
+                          color: Colors.white, size: 20),
                     ),
                   ],
                 ),
@@ -268,7 +358,8 @@ class FineDetailsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textTertiary),
+                const Icon(Icons.location_on_outlined,
+                    size: 16, color: AppColors.textTertiary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(fine.location, style: AppTextStyles.bodySmall),
@@ -287,7 +378,11 @@ class _DetailRow extends StatelessWidget {
   final String value;
   final Color? valueColor;
   final bool isMono;
-  const _DetailRow({required this.label, required this.value, this.valueColor, this.isMono = false});
+  const _DetailRow(
+      {required this.label,
+      required this.value,
+      this.valueColor,
+      this.isMono = false});
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +396,9 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             value,
             style: isMono
-                ? AppTextStyles.mono.copyWith(fontSize: 12, color: valueColor ?? AppColors.primary)
+                ? AppTextStyles.mono.copyWith(
+                    fontSize: 12,
+                    color: valueColor ?? AppColors.primary)
                 : AppTextStyles.bodyMedium.copyWith(
                     color: valueColor ?? AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
@@ -333,10 +430,12 @@ class _ContestButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.balance_rounded, size: 18, color: AppColors.textTertiary),
+            const Icon(Icons.balance_rounded,
+                size: 18, color: AppColors.textTertiary),
             const SizedBox(width: 8),
             Text('Contester cette amende',
-                style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textTertiary)),
+                style: AppTextStyles.buttonMedium
+                    .copyWith(color: AppColors.textTertiary)),
           ],
         ),
       ),
@@ -351,23 +450,34 @@ class _MockMapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppColors.divider.withValues(alpha: 0.3)..strokeWidth = 0.5;
-    // Grid lines simulating map
+    final paint = Paint()
+      ..color = AppColors.divider.withValues(alpha: 0.3)
+      ..strokeWidth = 0.5;
     for (double x = 0; x < size.width; x += 20) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
     for (double y = 0; y < size.height; y += 20) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
-    // Road lines
-    final roadPaint = Paint()..color = AppColors.divider.withValues(alpha: 0.5)..strokeWidth = 6..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(0, size.height * 0.45), Offset(size.width, size.height * 0.45), roadPaint);
-    canvas.drawLine(Offset(size.width * 0.5, 0), Offset(size.width * 0.5, size.height), roadPaint);
-    // Subtle blocks
-    final blockPaint = Paint()..color = AppColors.surfaceVariant.withValues(alpha: 0.5)..style = PaintingStyle.fill;
-    canvas.drawRect(Rect.fromLTWH(size.width * 0.1, size.height * 0.1, 60, 40), blockPaint);
-    canvas.drawRect(Rect.fromLTWH(size.width * 0.55, size.height * 0.55, 80, 50), blockPaint);
-    canvas.drawRect(Rect.fromLTWH(size.width * 0.65, size.height * 0.1, 50, 35), blockPaint);
+    final roadPaint = Paint()
+      ..color = AppColors.divider.withValues(alpha: 0.5)
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(0, size.height * 0.45),
+        Offset(size.width, size.height * 0.45), roadPaint);
+    canvas.drawLine(Offset(size.width * 0.5, 0),
+        Offset(size.width * 0.5, size.height), roadPaint);
+    final blockPaint = Paint()
+      ..color = AppColors.surfaceVariant.withValues(alpha: 0.5)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+        Rect.fromLTWH(size.width * 0.1, size.height * 0.1, 60, 40), blockPaint);
+    canvas.drawRect(
+        Rect.fromLTWH(size.width * 0.55, size.height * 0.55, 80, 50),
+        blockPaint);
+    canvas.drawRect(
+        Rect.fromLTWH(size.width * 0.65, size.height * 0.1, 50, 35),
+        blockPaint);
   }
 
   @override

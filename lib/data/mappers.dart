@@ -55,9 +55,10 @@ FineModel fineFromJson(Map<String, dynamic> j) {
     location: j['adresseApprox'] as String? ?? '',
     latitude: (j['latitude'] as num?)?.toDouble() ?? 0,
     longitude: (j['longitude'] as num?)?.toDouble() ?? 0,
+    paymentId: payment?['id'] as String?,
     paymentRef: payment?['transactionId'] as String?,
     paidAt: _dateOrNull(payment?['confirmedAt']),
-    paymentMethod: payment?['operateur'] as String?,
+    paymentMethod: payment?['mode'] as String? ?? payment?['operateur'] as String?,
   );
 }
 

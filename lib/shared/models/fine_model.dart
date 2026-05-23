@@ -20,6 +20,7 @@ class FineModel {
   final String location;
   final double latitude;
   final double longitude;
+  final String? paymentId;   // UUID du paiement (pour le reçu)
   final String? paymentRef;
   final DateTime? paidAt;
   final String? paymentMethod;
@@ -44,6 +45,7 @@ class FineModel {
     required this.location,
     required this.latitude,
     required this.longitude,
+    this.paymentId,
     this.paymentRef,
     this.paidAt,
     this.paymentMethod,
@@ -72,6 +74,7 @@ class FineModel {
       location: 'Avenue de l\'Indépendance, Brazzaville',
       latitude: -4.2634,
       longitude: 15.2429,
+      paymentId: null,
     ),
     FineModel(
       id: 'FIN002',
@@ -93,6 +96,7 @@ class FineModel {
       location: 'Boulevard Denis Sassou Nguesso, Brazzaville',
       latitude: -4.2767,
       longitude: 15.2589,
+      paymentId: null,
       paymentRef: 'MTN-2024-78923',
       paidAt: DateTime.now().subtract(const Duration(days: 30)),
       paymentMethod: 'MTN Mobile Money',
@@ -117,6 +121,7 @@ class FineModel {
       location: 'Rue Makotipoko, Brazzaville',
       latitude: -4.2891,
       longitude: 15.2312,
+      paymentId: null,
     ),
     FineModel(
       id: 'FIN004',
@@ -138,6 +143,7 @@ class FineModel {
       location: 'Rond-point Moungali, Brazzaville',
       latitude: -4.2456,
       longitude: 15.2687,
+      paymentId: null,
     ),
   ];
 }

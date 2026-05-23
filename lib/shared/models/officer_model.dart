@@ -16,6 +16,10 @@ class OfficerModel {
   final double totalRevenue;
   final DateTime? lastActivity;
   final DateTime joinedDate;
+  final bool onDuty;
+  final double? lastLat;
+  final double? lastLng;
+  final DateTime? lastSeenAt;
 
   const OfficerModel({
     required this.id,
@@ -33,6 +37,10 @@ class OfficerModel {
     required this.totalRevenue,
     this.lastActivity,
     required this.joinedDate,
+    this.onDuty = false,
+    this.lastLat,
+    this.lastLng,
+    this.lastSeenAt,
   });
 
   String get fullName => '$firstName $lastName';

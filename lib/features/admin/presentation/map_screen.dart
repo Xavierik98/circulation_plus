@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import '../../../shared/models/officer_model.dart';
 import '../../../data/providers.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -63,13 +64,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final heatmapPoints = heatmapAsync.valueOrNull ?? [];
     final zones = heatmapPoints.isEmpty ? _baseZones : _enrichZones(heatmapPoints);
 
+    // Agents terrain avec GPS
+    final officersAsync = ref.watch(officersProvider(''));
+    final officers = officersAsync.valueOrNull
+            ?.where((o) => o.lastLat != null && o.lastLng != null)
+            .toList() ??
+        [];
+
+    final isLoading = heatmapAsync.isLoading ||
+        (_selectedView == 'officers' && officersAsync.isLoading);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         title: Text('Carte nationale', style: AppTextStyles.titleMedium),
         actions: [
-          if (heatmapAsync.isLoading)
+          if (isLoading)
             const Padding(
               padding: EdgeInsets.only(right: 12),
               child: SizedBox(
@@ -81,7 +92,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           else
             IconButton(
               icon: const Icon(Icons.refresh_rounded, size: 20),
-              onPressed: () => ref.invalidate(heatmapProvider),
+              onPressed: () {
+                ref.invalidate(heatmapProvider);
+                ref.invalidate(officersProvider(''));
+              },
             ),
           IconButton(
             icon: const Icon(Icons.layers_outlined, size: 20),
@@ -98,8 +112,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       body: Column(
         children: [
           _buildViewSelector(),
-          Expanded(child: _buildMap(zones, heatmapPoints)),
-          _buildZoneList(zones),
+          Expanded(child: _buildMap(zones, heatmapPoints, officers)),
+          if (_selectedView != 'officers') _buildZoneList(zones),
+          if (_selectedView == 'officers') _buildOfficerList(officers),
         ],
       ),
     );
@@ -152,7 +167,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  Widget _buildMap(List<_Zone> zones, List<dynamic> heatmapPoints) {
+  Widget _buildMap(List<_Zone> zones, List<dynamic> heatmapPoints,
+      List<OfficerModel> officers) {
     return Container(
       color: const Color(0xFF0A1525),
       child: Stack(
@@ -169,25 +185,37 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           ),
 
-          // Zone markers
-          ...zones.asMap().entries.map((entry) {
-            final zone = entry.value;
-            final pos = _geoToScreen(zone.lat, zone.lng);
-            return Positioned(
-              left: pos.dx - 20,
-              top: pos.dy - 20,
-              child: GestureDetector(
-                onTap: () => setState(
-                    () => _hoveredZone =
-                        _hoveredZone == entry.key ? null : entry.key),
-                child: _ZoneMarker(
-                  zone: zone,
-                  isSelected: _hoveredZone == entry.key,
-                  viewMode: _selectedView,
+          // Zone markers (heatmap / zones view)
+          if (_selectedView != 'officers')
+            ...zones.asMap().entries.map((entry) {
+              final zone = entry.value;
+              final pos = _geoToScreen(zone.lat, zone.lng);
+              return Positioned(
+                left: pos.dx - 20,
+                top: pos.dy - 20,
+                child: GestureDetector(
+                  onTap: () => setState(
+                      () => _hoveredZone =
+                          _hoveredZone == entry.key ? null : entry.key),
+                  child: _ZoneMarker(
+                    zone: zone,
+                    isSelected: _hoveredZone == entry.key,
+                    viewMode: _selectedView,
+                  ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
+
+          // Officer dots (officers view)
+          if (_selectedView == 'officers')
+            ...officers.map((o) {
+              final pos = _geoToScreen(o.lastLat!, o.lastLng!);
+              return Positioned(
+                left: pos.dx - 14,
+                top: pos.dy - 14,
+                child: _OfficerDot(officer: o),
+              );
+            }),
 
           // Legend
           Positioned(
@@ -197,14 +225,131 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
 
           // Selected zone info
-          if (_hoveredZone != null && _hoveredZone! < zones.length)
+          if (_selectedView != 'officers' &&
+              _hoveredZone != null &&
+              _hoveredZone! < zones.length)
             Positioned(
               top: 12,
               left: 12,
               right: 80,
               child: _ZoneInfoCard(zone: zones[_hoveredZone!]),
             ),
+
+          // Officers count badge
+          if (_selectedView == 'officers')
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.badge_outlined,
+                        size: 14, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${officers.where((o) => o.onDuty).length} en service / ${officers.length} localisés',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOfficerList(List<OfficerModel> officers) {
+    if (officers.isEmpty) {
+      return Container(
+        height: 80,
+        color: AppColors.surface,
+        child: Center(
+          child: Text(
+            'Aucun agent localisé actuellement',
+            style:
+                AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+          ),
+        ),
+      );
+    }
+    return Container(
+      height: 100,
+      color: AppColors.surface,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: officers.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final o = officers[i];
+          return Container(
+            width: 130,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: o.onDuty
+                    ? AppColors.success.withValues(alpha: 0.4)
+                    : AppColors.cardBorder,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: o.onDuty
+                            ? AppColors.success
+                            : AppColors.textDisabled,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        o.badgeNumber,
+                        style: AppTextStyles.mono.copyWith(fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  o.fullName,
+                  style: AppTextStyles.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Spacer(),
+                Text(
+                  o.onDuty ? 'En service' : 'Hors service',
+                  style: AppTextStyles.caption.copyWith(
+                    color: o.onDuty
+                        ? AppColors.success
+                        : AppColors.textDisabled,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -295,6 +440,44 @@ class _Zone {
   final int count;
   final String risk;
   const _Zone(this.name, this.lat, this.lng, this.riskLevel, this.count, this.risk);
+}
+
+class _OfficerDot extends StatelessWidget {
+  final OfficerModel officer;
+  const _OfficerDot({required this.officer});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = officer.onDuty ? AppColors.success : AppColors.textDisabled;
+    return Tooltip(
+      message: '${officer.badgeNumber} — ${officer.fullName}\n'
+          '${officer.onDuty ? "En service" : "Hors service"}',
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.2),
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 1.5),
+          boxShadow: [
+            BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 6),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            officer.avatarInitials.isNotEmpty
+                ? officer.avatarInitials[0]
+                : '?',
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ZoneMarker extends StatelessWidget {

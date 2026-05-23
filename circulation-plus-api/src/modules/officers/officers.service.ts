@@ -18,8 +18,12 @@ export interface OfficerWithStats {
   badgeNumber: string | null;
   telephone: string | null;
   actif: boolean;
+  onDuty: boolean;
   mustChangePassword: boolean;
   createdAt: Date;
+  lastLat: number | null;
+  lastLng: number | null;
+  lastSeenAt: Date | null;
   totalFines: number;
   montantCollecte: number;
 }
@@ -87,8 +91,12 @@ export async function listOfficers(params: {
         badgeNumber: officer.badgeNumber,
         telephone: officer.telephone,
         actif: officer.actif,
+        onDuty: officer.onDuty,
         mustChangePassword: officer.mustChangePassword,
         createdAt: officer.createdAt,
+        lastLat: officer.lastLat ? Number(officer.lastLat) : null,
+        lastLng: officer.lastLng ? Number(officer.lastLng) : null,
+        lastSeenAt: officer.lastSeenAt,
         totalFines,
         montantCollecte: collected._sum.montantTotal ?? 0,
       };

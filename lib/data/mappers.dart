@@ -84,8 +84,12 @@ OfficerModel officerFromJson(Map<String, dynamic> j) {
     totalInfractions: (j['totalFines'] as num?)?.toInt() ?? 0,
     todayInfractions: 0,
     totalRevenue: (j['montantCollecte'] as num?)?.toDouble() ?? 0,
-    lastActivity: null,
+    lastActivity: _dateOrNull(j['lastSeenAt']),
     joinedDate: _date(j['createdAt']),
+    onDuty: j['onDuty'] as bool? ?? false,
+    lastLat: (j['lastLat'] as num?)?.toDouble(),
+    lastLng: (j['lastLng'] as num?)?.toDouble(),
+    lastSeenAt: _dateOrNull(j['lastSeenAt']),
   );
 }
 

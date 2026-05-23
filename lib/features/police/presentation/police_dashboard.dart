@@ -2,6 +2,7 @@
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/officer_model.dart';
@@ -42,12 +43,36 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     final newStatus = !_onDuty;
     setState(() => _statusLoading = true);
     try {
+      double? lat;
+      double? lng;
+
+      if (newStatus) {
+        // Demander/vérifier la permission GPS seulement quand on passe en service
+        try {
+          var permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission == LocationPermission.whileInUse ||
+              permission == LocationPermission.always) {
+            final pos = await Geolocator.getCurrentPosition(
+              locationSettings:
+                  const LocationSettings(accuracy: LocationAccuracy.high),
+            );
+            lat = pos.latitude;
+            lng = pos.longitude;
+          }
+        } catch (_) {
+          // GPS indisponible : on met quand même à jour le statut sans coordonnées
+        }
+      }
+
       await ApiClient.instance.post(
         '/api/officers/me/status',
         body: {
           'onDuty': newStatus,
-          'lat': 0.0,
-          'lng': 0.0,
+          if (lat != null) 'lat': lat,
+          if (lng != null) 'lng': lng,
         },
       );
       setState(() => _onDuty = newStatus);

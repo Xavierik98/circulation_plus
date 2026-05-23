@@ -1,37 +1,88 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import '../../../data/providers.dart';
 
-class MapScreen extends StatefulWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen> {
   String _selectedView = 'heatmap';
   int? _hoveredZone;
 
-  static const _zones = [
-    _Zone('Brazzaville Centre', -4.2634, 15.2429, 0.92, 847, 'high'),
-    _Zone('Brazzaville Nord', -4.2100, 15.2800, 0.65, 512, 'medium'),
-    _Zone('Brazzaville Sud', -4.3200, 15.2200, 0.48, 312, 'medium'),
-    _Zone('Pointe-Noire', -4.7769, 11.8635, 0.78, 634, 'high'),
-    _Zone('Dolisie', -4.1980, 12.6690, 0.35, 187, 'low'),
-    _Zone('Nkayi', -4.1700, 13.2800, 0.22, 98, 'low'),
-    _Zone('Brazzaville Est', -4.2500, 15.3100, 0.55, 423, 'medium'),
+  /// Zones de référence (villes principales). Les compteurs sont enrichis
+  /// avec les données réelles de l'API heatmap si disponibles.
+  static const _baseZones = [
+    _Zone('Brazzaville Centre', -4.2634, 15.2429, 0.0, 0, 'medium'),
+    _Zone('Brazzaville Nord', -4.2100, 15.2800, 0.0, 0, 'low'),
+    _Zone('Brazzaville Sud', -4.3200, 15.2200, 0.0, 0, 'low'),
+    _Zone('Pointe-Noire', -4.7769, 11.8635, 0.0, 0, 'medium'),
+    _Zone('Dolisie', -4.1980, 12.6690, 0.0, 0, 'low'),
+    _Zone('Nkayi', -4.1700, 13.2800, 0.0, 0, 'low'),
+    _Zone('Brazzaville Est', -4.2500, 15.3100, 0.0, 0, 'low'),
   ];
+
+  /// Enrichit les zones avec les points réels du heatmap API.
+  List<_Zone> _enrichZones(List<dynamic> heatmapPoints) {
+    // Pour chaque zone, compter les points dans un rayon de ~0.5°
+    return _baseZones.map((z) {
+      int count = 0;
+      for (final p in heatmapPoints) {
+        final m = p as Map<String, dynamic>;
+        final lat = (m['latitude'] as num?)?.toDouble() ?? 0;
+        final lng = (m['longitude'] as num?)?.toDouble() ?? 0;
+        final c = (m['count'] as num?)?.toInt() ?? 1;
+        final dLat = lat - z.lat;
+        final dLng = lng - z.lng;
+        if (dLat * dLat + dLng * dLng < 0.25) count += c; // rayon ~0.5°
+      }
+      final total = heatmapPoints.fold<int>(
+          0, (s, p) => s + ((p as Map<String, dynamic>)['count'] as num? ?? 1).toInt());
+      final risk = total == 0
+          ? 'low'
+          : count / (total / _baseZones.length) > 1.5
+              ? 'high'
+              : count > 0
+                  ? 'medium'
+                  : 'low';
+      final riskLevel = total > 0 ? (count / total).clamp(0.0, 1.0) : 0.0;
+      return _Zone(z.name, z.lat, z.lng, riskLevel, count, risk);
+    }).toList()
+      ..sort((a, b) => b.count.compareTo(a.count));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final heatmapAsync = ref.watch(heatmapProvider);
+    final heatmapPoints = heatmapAsync.valueOrNull ?? [];
+    final zones = heatmapPoints.isEmpty ? _baseZones : _enrichZones(heatmapPoints);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         title: Text('Carte nationale', style: AppTextStyles.titleMedium),
         actions: [
+          if (heatmapAsync.isLoading)
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      color: AppColors.primary, strokeWidth: 2)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              onPressed: () => ref.invalidate(heatmapProvider),
+            ),
           IconButton(
             icon: const Icon(Icons.layers_outlined, size: 20),
             onPressed: () {},
@@ -39,14 +90,16 @@ class _MapScreenState extends State<MapScreen> {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
-          child: Container(height: 3, decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
+          child: Container(
+              height: 3,
+              decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
         ),
       ),
       body: Column(
         children: [
           _buildViewSelector(),
-          Expanded(child: _buildMap()),
-          _buildZoneList(),
+          Expanded(child: _buildMap(zones, heatmapPoints)),
+          _buildZoneList(zones),
         ],
       ),
     );
@@ -99,31 +152,34 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildMap() {
+  Widget _buildMap(List<_Zone> zones, List<dynamic> heatmapPoints) {
     return Container(
       color: const Color(0xFF0A1525),
       child: Stack(
         children: [
-          // Map base
+          // Map base + heatmap overlay
           Positioned.fill(
             child: CustomPaint(
               painter: _CongoMapPainter(
                 selectedView: _selectedView,
-                zones: _zones,
+                zones: zones,
                 hoveredZone: _hoveredZone,
+                heatmapPoints: heatmapPoints,
               ),
             ),
           ),
 
           // Zone markers
-          ..._zones.asMap().entries.map((entry) {
+          ...zones.asMap().entries.map((entry) {
             final zone = entry.value;
             final pos = _geoToScreen(zone.lat, zone.lng);
             return Positioned(
               left: pos.dx - 20,
               top: pos.dy - 20,
               child: GestureDetector(
-                onTap: () => setState(() => _hoveredZone = _hoveredZone == entry.key ? null : entry.key),
+                onTap: () => setState(
+                    () => _hoveredZone =
+                        _hoveredZone == entry.key ? null : entry.key),
                 child: _ZoneMarker(
                   zone: zone,
                   isSelected: _hoveredZone == entry.key,
@@ -141,12 +197,12 @@ class _MapScreenState extends State<MapScreen> {
           ),
 
           // Selected zone info
-          if (_hoveredZone != null)
+          if (_hoveredZone != null && _hoveredZone! < zones.length)
             Positioned(
               top: 12,
               left: 12,
               right: 80,
-              child: _ZoneInfoCard(zone: _zones[_hoveredZone!]),
+              child: _ZoneInfoCard(zone: zones[_hoveredZone!]),
             ),
         ],
       ),
@@ -196,7 +252,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildZoneList() {
+  Widget _buildZoneList(List<_Zone> zones) {
     return Container(
       height: 140,
       decoration: const BoxDecoration(
@@ -214,13 +270,14 @@ class _MapScreenState extends State<MapScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _zones.length,
+              itemCount: zones.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, i) {
-                final z = _zones[i];
+                final z = zones[i];
                 return _ZoneChip(zone: z)
                     .animate(delay: Duration(milliseconds: i * 60))
-                    .fadeIn().slideX(begin: 0.1);
+                    .fadeIn()
+                    .slideX(begin: 0.1);
               },
             ),
           ),
@@ -393,7 +450,13 @@ class _CongoMapPainter extends CustomPainter {
   final String selectedView;
   final List<_Zone> zones;
   final int? hoveredZone;
-  _CongoMapPainter({required this.selectedView, required this.zones, required this.hoveredZone});
+  final List<dynamic> heatmapPoints;
+  _CongoMapPainter({
+    required this.selectedView,
+    required this.zones,
+    required this.hoveredZone,
+    required this.heatmapPoints,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -458,27 +521,62 @@ class _CongoMapPainter extends CustomPainter {
       );
     canvas.drawPath(riverPath, riverPaint);
 
-    // Heatmap circles for zones
+    // Heatmap overlay
     if (selectedView == 'heatmap') {
-      for (final zone in zones) {
-        final Color zoneColor = switch (zone.risk) {
-          'high' => AppColors.error,
-          'medium' => AppColors.warning,
-          _ => AppColors.success,
-        };
-        final x = (zone.lng - 11.0) / (18.5 - 11.0) * size.width;
-        final y = (3.5 - zone.lat) / (3.5 - (-5.5)) * size.height;
-
-        final heatPaint = Paint()
-          ..shader = RadialGradient(
-            colors: [zoneColor.withValues(alpha: zone.riskLevel * 0.3), Colors.transparent],
-          ).createShader(Rect.fromCircle(center: Offset(x, y), radius: 60));
-        canvas.drawCircle(Offset(x, y), 60, heatPaint);
+      // Si des données réelles sont disponibles, les afficher en priorité
+      if (heatmapPoints.isNotEmpty) {
+        final maxCount = heatmapPoints.fold<int>(
+          1,
+          (m, p) {
+            final c = ((p as Map<String, dynamic>)['count'] as num?)?.toInt() ?? 1;
+            return c > m ? c : m;
+          },
+        );
+        for (final p in heatmapPoints) {
+          final m = p as Map<String, dynamic>;
+          final lat = (m['latitude'] as num?)?.toDouble() ?? 0;
+          final lng = (m['longitude'] as num?)?.toDouble() ?? 0;
+          final count = (m['count'] as num?)?.toInt() ?? 1;
+          final intensity = count / maxCount;
+          final x = (lng - 11.0) / (18.5 - 11.0) * size.width;
+          final y = (3.5 - lat) / (3.5 - (-5.5)) * size.height;
+          final color = intensity > 0.6
+              ? AppColors.error
+              : intensity > 0.3
+                  ? AppColors.warning
+                  : AppColors.success;
+          final heatPaint = Paint()
+            ..shader = RadialGradient(
+              colors: [color.withValues(alpha: intensity * 0.4), Colors.transparent],
+            ).createShader(Rect.fromCircle(center: Offset(x, y), radius: 50));
+          canvas.drawCircle(Offset(x, y), 50, heatPaint);
+        }
+      } else {
+        // Fallback sur les zones
+        for (final zone in zones) {
+          final Color zoneColor = switch (zone.risk) {
+            'high' => AppColors.error,
+            'medium' => AppColors.warning,
+            _ => AppColors.success,
+          };
+          final x = (zone.lng - 11.0) / (18.5 - 11.0) * size.width;
+          final y = (3.5 - zone.lat) / (3.5 - (-5.5)) * size.height;
+          final heatPaint = Paint()
+            ..shader = RadialGradient(
+              colors: [
+                zoneColor.withValues(alpha: zone.riskLevel * 0.25),
+                Colors.transparent
+              ],
+            ).createShader(Rect.fromCircle(center: Offset(x, y), radius: 60));
+          canvas.drawCircle(Offset(x, y), 60, heatPaint);
+        }
       }
     }
   }
 
   @override
   bool shouldRepaint(covariant _CongoMapPainter oldDelegate) =>
-      oldDelegate.selectedView != selectedView || oldDelegate.hoveredZone != hoveredZone;
+      oldDelegate.selectedView != selectedView ||
+      oldDelegate.hoveredZone != hoveredZone ||
+      oldDelegate.heatmapPoints.length != heatmapPoints.length;
 }

@@ -307,6 +307,9 @@ class StatsRepository {
   Future<Map<String, dynamic>> officerStats() async =>
       await _api.get('/api/stats/me') as Map<String, dynamic>;
 
+  Future<Map<String, dynamic>> adminStats() async =>
+      await _api.get('/api/stats/admin') as Map<String, dynamic>;
+
   Future<Map<String, dynamic>> revenue({String? from, String? to}) async =>
       await _api.get('/api/stats/revenue', query: {
         if (from != null) 'dateFrom': from,

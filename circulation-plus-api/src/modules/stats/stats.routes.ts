@@ -4,7 +4,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ok } from '../../shared/utils/response';
 import { authenticate } from '../../shared/middleware/authenticate';
 import { authorize } from '../../shared/middleware/authorize';
-import { getRevenueStats, getHeatmap, getOfficerStats } from './stats.service';
+import { getRevenueStats, getHeatmap, getOfficerStats, getAdminStats } from './stats.service';
 
 const revenueQuerySchema = z.object({
   dateFrom: z.string().datetime().optional(),
@@ -28,6 +28,21 @@ export async function statsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request) => ok(await getOfficerStats(request.user!.id)),
+  );
+
+  // GET /api/stats/admin — KPIs nationaux (tableau de bord admin)
+  r.get(
+    '/admin',
+    {
+      preHandler: [authenticate, authorize('ADMIN')],
+      schema: {
+        tags: ['Statistiques'],
+        summary: 'KPIs nationaux pour le tableau de bord administrateur',
+        description: 'Rôle autorisé : ADMIN.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async () => ok(await getAdminStats()),
   );
 
   r.get(

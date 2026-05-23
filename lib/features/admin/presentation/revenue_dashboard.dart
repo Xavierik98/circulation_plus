@@ -1,27 +1,51 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/animated_counter.dart';
+import '../../../data/providers.dart';
 
-class RevenueDashboard extends StatelessWidget {
+class RevenueDashboard extends ConsumerWidget {
   const RevenueDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(revenueStatsProvider);
+    final stats = statsAsync.valueOrNull;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         title: Text('Tableau des revenus', style: AppTextStyles.titleMedium),
         actions: [
-          IconButton(icon: const Icon(Icons.download_outlined, size: 20), onPressed: () {}),
+          if (statsAsync.isLoading)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      color: AppColors.primary, strokeWidth: 2)),
+            )
+          else ...[
+            IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                onPressed: () => ref.invalidate(revenueStatsProvider)),
+            IconButton(
+                icon: const Icon(Icons.download_outlined, size: 20),
+                onPressed: () {}),
+          ],
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
-          child: Container(height: 3, decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
+          child: Container(
+              height: 3,
+              decoration: const BoxDecoration(
+                  gradient: AppColors.congoFlagGradient)),
         ),
       ),
       body: SingleChildScrollView(
@@ -29,15 +53,13 @@ class RevenueDashboard extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            _buildYTDCard(),
+            _buildYTDCard(stats),
             const SizedBox(height: 20),
-            _buildMonthlyComparison(),
+            _buildMonthlyChart(stats),
             const SizedBox(height: 20),
-            _buildRevenueByCity(),
+            _buildByInfraction(stats),
             const SizedBox(height: 20),
-            _buildPaymentMethods(),
-            const SizedBox(height: 20),
-            _buildPendingRevenue(),
+            _buildPendingRevenue(stats),
             const SizedBox(height: 32),
           ],
         ),
@@ -45,7 +67,18 @@ class RevenueDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildYTDCard() {
+  Widget _buildYTDCard(Map<String, dynamic>? stats) {
+    final totalCollected = (stats?['totalCollected'] as num?)?.toInt() ?? 0;
+    final totalFines = (stats?['totalFines'] as num?)?.toInt() ?? 0;
+    final paidFines = (stats?['paidFines'] as num?)?.toInt() ?? 0;
+    final pendingFines = (stats?['pendingFines'] as num?)?.toInt() ?? 0;
+    final paymentRate = totalFines > 0
+        ? ((paidFines / totalFines) * 100).toStringAsFixed(1)
+        : '0.0';
+
+    final collectedM = (totalCollected / 1000000);
+    final collectedInt = (totalCollected / 1000000 * 10).round(); // for AnimatedCounter
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -55,9 +88,13 @@ class RevenueDashboard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+        border:
+            Border.all(color: AppColors.success.withValues(alpha: 0.3)),
         boxShadow: [
-          BoxShadow(color: AppColors.success.withValues(alpha: 0.1), blurRadius: 24, offset: const Offset(0, 8)),
+          BoxShadow(
+              color: AppColors.success.withValues(alpha: 0.1),
+              blurRadius: 24,
+              offset: const Offset(0, 8)),
         ],
       ),
       child: Column(
@@ -65,41 +102,65 @@ class RevenueDashboard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('Revenus cumulés 2024', style: AppTextStyles.bodySmall.copyWith(color: AppColors.success)),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text('+14.7% vs 2023', style: AppTextStyles.caption.copyWith(color: AppColors.success)),
+              Text(
+                'Revenus collectés — Tout temps',
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.success),
               ),
+              const Spacer(),
+              if (stats == null)
+                const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: AppColors.success, strokeWidth: 2)),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              AnimatedCounter(
-                end: 2847,
-                suffix: 'M',
-                style: AppTextStyles.displaySmall.copyWith(color: AppColors.textPrimary),
-              ),
+              stats == null
+                  ? Text('—',
+                      style: AppTextStyles.displaySmall
+                          .copyWith(color: AppColors.textPrimary))
+                  : AnimatedCounter(
+                      end: collectedInt,
+                      suffix: collectedM >= 1000
+                          ? 'G'
+                          : collectedM >= 1
+                              ? 'M'
+                              : 'K',
+                      style: AppTextStyles.displaySmall
+                          .copyWith(color: AppColors.textPrimary),
+                    ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: Text(' FCFA', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.success)),
+                child: Text(' FCFA',
+                    style: AppTextStyles.bodyMedium
+                        .copyWith(color: AppColors.success)),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              const _YtdStat(label: 'Collecté', value: '2 847M', color: AppColors.success),
-              Container(width: 1, height: 32, color: AppColors.divider),
-              const _YtdStat(label: 'En attente', value: '847M', color: AppColors.warning),
-              Container(width: 1, height: 32, color: AppColors.divider),
-              const _YtdStat(label: 'Taux', value: '77.1%', color: AppColors.primary),
+              _YtdStat(
+                  label: 'Payées',
+                  value: stats == null ? '—' : '$paidFines',
+                  color: AppColors.success),
+              Container(
+                  width: 1, height: 32, color: AppColors.divider),
+              _YtdStat(
+                  label: 'En attente',
+                  value: stats == null ? '—' : '$pendingFines',
+                  color: AppColors.warning),
+              Container(
+                  width: 1, height: 32, color: AppColors.divider),
+              _YtdStat(
+                  label: 'Taux',
+                  value: stats == null ? '—' : '$paymentRate%',
+                  color: AppColors.primary),
             ],
           ),
         ],
@@ -107,10 +168,35 @@ class RevenueDashboard extends StatelessWidget {
     ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.97, 0.97));
   }
 
-  Widget _buildMonthlyComparison() {
-    final months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû'];
-    final data2024 = [180.0, 220.0, 195.0, 310.0, 280.0, 340.0, 295.0, 372.0];
-    final data2023 = [152.0, 190.0, 168.0, 275.0, 248.0, 298.0, 261.0, 320.0];
+  Widget _buildMonthlyChart(Map<String, dynamic>? stats) {
+    // Grouper byDay par mois
+    final byDay =
+        (stats?['byDay'] as List<dynamic>? ?? [])
+            .map((d) => d as Map<String, dynamic>)
+            .toList();
+
+    // Agréger par mois (YYYY-MM)
+    final Map<String, double> monthMap = {};
+    for (final d in byDay) {
+      final date = d['date'] as String? ?? '';
+      if (date.length >= 7) {
+        final ym = date.substring(0, 7);
+        monthMap[ym] =
+            (monthMap[ym] ?? 0) + ((d['amount'] as num?)?.toDouble() ?? 0) / 1000000;
+      }
+    }
+
+    final sorted = monthMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final last8 = sorted.length > 8 ? sorted.sublist(sorted.length - 8) : sorted;
+
+    final labels = last8.map((e) {
+      final parts = e.key.split('-');
+      const mois = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+      final m = int.tryParse(parts.elementAtOrNull(1) ?? '') ?? 0;
+      return m > 0 ? mois[m] : e.key;
+    }).toList();
+    final values = last8.map((e) => e.value).toList();
+    final maxY = values.isEmpty ? 10.0 : values.reduce((a, b) => a > b ? a : b) * 1.3;
 
     return PremiumCard(
       child: Column(
@@ -118,99 +204,121 @@ class RevenueDashboard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.compare_arrows_rounded, size: 18, color: AppColors.primary),
+              const Icon(Icons.compare_arrows_rounded,
+                  size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
-              Text('Comparaison annuelle (M FCFA)', style: AppTextStyles.titleMedium),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Row(
-            children: [
-              _ChartLegend(color: AppColors.primary, label: '2024'),
-              SizedBox(width: 16),
-              _ChartLegend(color: AppColors.textTertiary, label: '2023'),
+              Text('Revenus récents (M FCFA)',
+                  style: AppTextStyles.titleMedium),
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 180,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (val) =>
-                      const FlLine(color: AppColors.divider, strokeWidth: 0.5),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (val, _) {
-                        final i = val.toInt();
-                        if (i >= months.length) return const SizedBox.shrink();
-                        return Text(months[i], style: AppTextStyles.caption.copyWith(fontSize: 9));
-                      },
-                      reservedSize: 20,
+          stats == null || byDay.isEmpty
+              ? const SizedBox(
+                  height: 140,
+                  child: Center(
+                    child: Text(
+                      'Aucune donnée disponible\n(aucun paiement confirmé)',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textTertiary),
                     ),
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 32,
-                      getTitlesWidget: (val, _) => Text(
-                        '${val.toInt()}',
-                        style: AppTextStyles.caption.copyWith(fontSize: 9),
+                )
+              : SizedBox(
+                  height: 160,
+                  child: BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: maxY.clamp(1.0, double.infinity),
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            final val = rod.toY;
+                            return BarTooltipItem(
+                              '${val.toStringAsFixed(1)}M',
+                              AppTextStyles.caption
+                                  .copyWith(color: Colors.white),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                minY: 100,
-                maxY: 420,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: data2024.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
-                    isCurved: true,
-                    color: AppColors.primary,
-                    barWidth: 2.5,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [AppColors.primary.withValues(alpha: 0.15), Colors.transparent],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (val, _) {
+                              final i = val.toInt();
+                              if (i >= labels.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(labels[i],
+                                    style: AppTextStyles.caption
+                                        .copyWith(fontSize: 9)),
+                              );
+                            },
+                            reservedSize: 20,
+                          ),
+                        ),
+                        leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
+                      gridData: FlGridData(
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (v) => const FlLine(
+                            color: AppColors.divider, strokeWidth: 0.5),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      barGroups: values.asMap().entries.map((e) {
+                        final isLast = e.key == values.length - 1;
+                        return BarChartGroupData(
+                          x: e.key,
+                          barRods: [
+                            BarChartRodData(
+                              toY: e.value,
+                              width: 18,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(5)),
+                              gradient: LinearGradient(
+                                colors: isLast
+                                    ? [AppColors.primary, AppColors.accent]
+                                    : [
+                                        AppColors.primary
+                                            .withValues(alpha: 0.6),
+                                        AppColors.primary
+                                            .withValues(alpha: 0.3)
+                                      ],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
                     ),
                   ),
-                  LineChartBarData(
-                    spots: data2023.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
-                    isCurved: true,
-                    color: AppColors.textTertiary,
-                    barWidth: 1.5,
-                    dashArray: [5, 5],
-                    dotData: const FlDotData(show: false),
-                  ),
-                ],
-              ),
-            ),
-          ),
+                ),
         ],
       ),
     ).animate().fadeIn(delay: 200.ms);
   }
 
-  Widget _buildRevenueByCity() {
-    final cities = [
-      ('Brazzaville', 1842, 0.647),
-      ('Pointe-Noire', 724, 0.254),
-      ('Dolisie', 156, 0.055),
-      ('Autres', 125, 0.044),
-    ];
+  Widget _buildByInfraction(Map<String, dynamic>? stats) {
+    final byInfraction = (stats?['byInfraction'] as List<dynamic>? ?? [])
+        .map((d) => d as Map<String, dynamic>)
+        .toList();
+
+    byInfraction.sort((a, b) =>
+        ((b['amount'] as num?)?.toInt() ?? 0)
+            .compareTo((a['amount'] as num?)?.toInt() ?? 0));
+
+    final topItems = byInfraction.take(5).toList();
+    final totalAmount = byInfraction.fold<int>(
+        0, (s, d) => s + ((d['amount'] as num?)?.toInt() ?? 0));
 
     return PremiumCard(
       child: Column(
@@ -218,145 +326,157 @@ class RevenueDashboard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.location_city_outlined, size: 18, color: AppColors.accent),
+              const Icon(Icons.gavel_rounded,
+                  size: 18, color: AppColors.accent),
               const SizedBox(width: 8),
-              Text('Revenus par ville (M FCFA)', style: AppTextStyles.titleMedium),
+              Text('Revenus par infraction',
+                  style: AppTextStyles.titleMedium),
             ],
           ),
           const SizedBox(height: 16),
-          ...cities.asMap().entries.map((entry) {
-            final (city, amount, share) = entry.value;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text(city, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary))),
-                      Text('${amount}M', style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary)),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 40,
-                        child: Text(
-                          '${(share * 100).toStringAsFixed(1)}%',
-                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
-                          textAlign: TextAlign.right,
+          if (topItems.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Aucune infraction payée',
+                  style: TextStyle(color: AppColors.textTertiary),
+                ),
+              ),
+            )
+          else
+            ...topItems.asMap().entries.map((entry) {
+              final item = entry.value;
+              final label = item['libelle'] as String? ?? '—';
+              final amount = (item['amount'] as num?)?.toInt() ?? 0;
+              final count = (item['count'] as num?)?.toInt() ?? 0;
+              final share = totalAmount > 0 ? amount / totalAmount : 0.0;
+              final color =
+                  AppColors.chartColors[entry.key % AppColors.chartColors.length];
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(2))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            label.length > 28 ? '${label.substring(0, 28)}…' : label,
+                            style: AppTextStyles.bodyMedium
+                                .copyWith(color: AppColors.textPrimary),
+                          ),
+                        ),
+                        Text('$count PV',
+                            style: AppTextStyles.caption
+                                .copyWith(color: AppColors.textTertiary)),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 55,
+                          child: Text(
+                            _fmtXaf(amount),
+                            style: AppTextStyles.labelSmall
+                                .copyWith(color: color),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: share),
+                      duration:
+                          Duration(milliseconds: 700 + entry.key * 80),
+                      curve: Curves.easeOutCubic,
+                      builder: (_, v, __) => ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: v,
+                          minHeight: 6,
+                          backgroundColor: AppColors.surfaceVariant,
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: share),
-                    duration: Duration(milliseconds: 800 + entry.key * 100),
-                    curve: Curves.easeOutCubic,
-                    builder: (_, value, __) => ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: value,
-                        minHeight: 6,
-                        backgroundColor: AppColors.surfaceVariant,
-                        color: AppColors.chartColors[entry.key % AppColors.chartColors.length],
-                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     ).animate().fadeIn(delay: 300.ms);
   }
 
-  Widget _buildPaymentMethods() {
-    return PremiumCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.payment_rounded, size: 18, color: AppColors.success),
-              const SizedBox(width: 8),
-              Text('Méthodes de paiement', style: AppTextStyles.titleMedium),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 100,
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 28,
-                      sections: [
-                        PieChartSectionData(color: const Color(0xFFFFCC00), value: 52, radius: 22, showTitle: false),
-                        PieChartSectionData(color: const Color(0xFFFF0000), value: 31, radius: 22, showTitle: false),
-                        PieChartSectionData(color: AppColors.textTertiary, value: 17, radius: 22, showTitle: false),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const Expanded(
-                flex: 2,
-                child: Column(
-                  children: [
-                    _PaymentRow('MTN Mobile Money', '52%', Color(0xFFFFCC00)),
-                    SizedBox(height: 8),
-                    _PaymentRow('Airtel Money', '31%', Color(0xFFFF0000)),
-                    SizedBox(height: 8),
-                    _PaymentRow('Espèces (Guichet)', '17%', AppColors.textTertiary),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 400.ms);
-  }
+  Widget _buildPendingRevenue(Map<String, dynamic>? stats) {
+    final pendingFines = (stats?['pendingFines'] as num?)?.toInt() ?? 0;
+    final overdueFines = (stats?['overdueFines'] as num?)?.toInt() ?? 0;
+    final totalPending = pendingFines + overdueFines;
 
-  Widget _buildPendingRevenue() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
+        border: Border.all(
+            color: AppColors.warning.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
-            width: 48, height: 48,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: AppColors.warning.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.pending_actions_rounded, color: AppColors.warning, size: 24),
+            child: const Icon(Icons.pending_actions_rounded,
+                color: AppColors.warning, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Revenus en attente', style: AppTextStyles.titleSmall),
-                Text('1 247 amendes impayées', style: AppTextStyles.bodySmall),
+                Text('Amendes en attente',
+                    style: AppTextStyles.titleSmall),
+                Text(
+                  stats == null
+                      ? 'Chargement...'
+                      : '$pendingFines en attente · $overdueFines en retard',
+                  style: AppTextStyles.bodySmall,
+                ),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('847M', style: AppTextStyles.headlineSmall.copyWith(color: AppColors.warning)),
-              Text('FCFA', style: AppTextStyles.caption.copyWith(color: AppColors.warning)),
+              Text(
+                stats == null ? '—' : '$totalPending',
+                style: AppTextStyles.headlineSmall
+                    .copyWith(color: AppColors.warning),
+              ),
+              Text('PV',
+                  style:
+                      AppTextStyles.caption.copyWith(color: AppColors.warning)),
             ],
           ),
         ],
       ),
     ).animate().fadeIn(delay: 500.ms);
+  }
+
+  String _fmtXaf(int amount) {
+    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M';
+    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(0)}K';
+    return amount.toString();
   }
 }
 
@@ -364,60 +484,19 @@ class _YtdStat extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _YtdStat({required this.label, required this.value, required this.color});
+  const _YtdStat(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: AppTextStyles.titleMedium.copyWith(color: color)),
+          Text(value,
+              style: AppTextStyles.titleMedium.copyWith(color: color)),
           Text(label, style: AppTextStyles.caption),
         ],
       ),
-    );
-  }
-}
-
-class _ChartLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _ChartLegend({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12, height: 3,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
-        ),
-        const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.caption),
-      ],
-    );
-  }
-}
-
-class _PaymentRow extends StatelessWidget {
-  final String label;
-  final String percent;
-  final Color color;
-  const _PaymentRow(this.label, this.percent, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 10, height: 10,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: AppTextStyles.bodySmall)),
-        Text(percent, style: AppTextStyles.labelSmall.copyWith(color: color)),
-      ],
     );
   }
 }

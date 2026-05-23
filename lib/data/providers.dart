@@ -5,6 +5,9 @@ import '../shared/models/notification_model.dart';
 import '../shared/models/infraction_model.dart';
 import 'repositories.dart';
 
+// Repository singletons (ajouts)
+final paymentRepositoryProvider = Provider((_) => PaymentRepository());
+
 // Dépôts (singletons).
 final authRepositoryProvider = Provider((_) => AuthRepository());
 final fineRepositoryProvider = Provider((_) => FineRepository());
@@ -56,10 +59,27 @@ final officerStatsProvider =
   return ref.read(statsRepositoryProvider).officerStats();
 });
 
+/// KPIs nationaux pour l'admin.
+final adminStatsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+  return ref.read(statsRepositoryProvider).adminStats();
+});
+
 /// Statistiques de revenus (admin).
 final revenueStatsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   return ref.read(statsRepositoryProvider).revenue();
+});
+
+/// Reçu d'un paiement (citoyen ou agent).
+final receiptProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, paymentId) {
+  return ref.read(paymentRepositoryProvider).receipt(paymentId);
+});
+
+/// Carte thermique des infractions (admin).
+final heatmapProvider = FutureProvider.autoDispose<List<dynamic>>((ref) {
+  return ref.read(statsRepositoryProvider).heatmap();
 });
 
 /// Infractions sélectionnées pendant le flux d'interpellation.

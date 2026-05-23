@@ -128,6 +128,74 @@ export async function getOfficerStats(officerId: string): Promise<{
   return { totalInfractions, monthInfractions, totalRevenue, paymentRate };
 }
 
+export async function getAdminStats(): Promise<{
+  totalFinesThisMonth: number;
+  totalRevenueThisMonth: number;
+  paymentRate: number;
+  activeOfficers: number;
+  totalOfficers: number;
+  overdueFines: number;
+  monthlyRevenue: { month: string; amount: number }[];
+}> {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Derniers 12 mois pour le graphique
+  const months: { label: string; from: Date; to: Date }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    months.push({
+      label: d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' }),
+      from: d,
+      to: next,
+    });
+  }
+
+  const [
+    totalFinesThisMonth,
+    totalFines,
+    paidFines,
+    overdueFines,
+    activeOfficers,
+    totalOfficers,
+    revenueThisMonth,
+  ] = await Promise.all([
+    prisma.fine.count({ where: { verbaliseLe: { gte: firstOfMonth } } }),
+    prisma.fine.count(),
+    prisma.fine.count({ where: { status: 'PAID' } }),
+    prisma.fine.count({ where: { status: 'OVERDUE' } }),
+    prisma.user.count({ where: { role: 'POLICE', actif: true, onDuty: true } }),
+    prisma.user.count({ where: { role: 'POLICE', actif: true } }),
+    prisma.payment.aggregate({
+      where: { status: 'CONFIRMED', confirmedAt: { gte: firstOfMonth } },
+      _sum: { montantTotal: true },
+    }),
+  ]);
+
+  const monthlyRevenue = await Promise.all(
+    months.map(async (m) => {
+      const agg = await prisma.payment.aggregate({
+        where: { status: 'CONFIRMED', confirmedAt: { gte: m.from, lt: m.to } },
+        _sum: { montantTotal: true },
+      });
+      return { month: m.label, amount: agg._sum.montantTotal ?? 0 };
+    }),
+  );
+
+  const paymentRate = totalFines > 0 ? Math.round((paidFines / totalFines) * 100) : 0;
+
+  return {
+    totalFinesThisMonth,
+    totalRevenueThisMonth: revenueThisMonth._sum.montantTotal ?? 0,
+    paymentRate,
+    activeOfficers,
+    totalOfficers,
+    overdueFines,
+    monthlyRevenue,
+  };
+}
+
 export async function getHeatmap(): Promise<
   { latitude: number; longitude: number; count: number }[]
 > {

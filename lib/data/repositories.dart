@@ -174,6 +174,17 @@ class FineRepository {
   Future<FineModel> create(Map<String, dynamic> body) async =>
       fineFromJson(await _api.post('/api/fines', body: body) as Map<String, dynamic>);
 
+  /// Soumet plusieurs amendes (un PV par infraction) via des appels séquentiels.
+  /// Retourne les modèles des amendes créées.
+  Future<List<FineModel>> createBatch(
+      List<Map<String, dynamic>> fines) async {
+    final results = <FineModel>[];
+    for (final body in fines) {
+      results.add(await create(body));
+    }
+    return results;
+  }
+
   Future<Map<String, dynamic>> pay(
     String fineId,
     String operateur,

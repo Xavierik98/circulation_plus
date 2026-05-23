@@ -6,8 +6,11 @@ import '../../../../theme/app_colors.dart';
 import '../../../../theme/app_text_styles.dart';
 import '../../../../shared/widgets/premium_button.dart';
 import '../../../../shared/models/interpellation_state.dart';
+import '../../../../shared/models/fine_model.dart';
 import '../../../../shared/services/pdf_service.dart';
 import '../../../../data/providers.dart';
+import '../../../../data/repositories.dart';
+import '../../../../data/api_client.dart';
 import '../../../auth/providers/auth_provider.dart';
 
 class InterpellationConfirmationScreen extends ConsumerStatefulWidget {
@@ -23,19 +26,85 @@ class _InterpellationConfirmationScreenState
     with SingleTickerProviderStateMixin {
   late AnimationController _checkController;
 
+  // ── Soumission PV ─────────────────────────────────────────────────────────
+  bool _isSubmitting = true;
+  bool _submitError = false;
+  String? _submitErrorMsg;
+  List<FineModel> _createdFines = [];
+
   @override
   void initState() {
     super.initState();
     _checkController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
-    Future.delayed(
-        const Duration(milliseconds: 300), () => _checkController.forward());
+    // Soumettre le PV dès l'arrivée sur cet écran
+    WidgetsBinding.instance.addPostFrameCallback((_) => _submitPv());
   }
 
   @override
   void dispose() {
     _checkController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitPv() async {
+    final interp = ref.read(interpellationProvider);
+    setState(() {
+      _isSubmitting = true;
+      _submitError = false;
+      _submitErrorMsg = null;
+    });
+
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final bodies = interp.selectedInfractions.map((infraction) {
+        return <String, dynamic>{
+          'infractionTypeId': infraction.id,
+          'driverPhone': interp.driverPhone.isNotEmpty
+              ? interp.driverPhone
+              : '+242000000000', // fallback si non renseigné
+          if (interp.driverName.isNotEmpty) 'driverName': interp.driverName,
+          if (interp.vehiclePlate.isNotEmpty) 'vehiclePlate': interp.vehiclePlate,
+          if (interp.driverLicense.isNotEmpty) 'numeroPermis': interp.driverLicense,
+          if (interp.lieuPrecis.isNotEmpty) 'adresseApprox': interp.lieuPrecis,
+          if (interp.gpsLat != null) 'latitude': interp.gpsLat,
+          if (interp.gpsLng != null) 'longitude': interp.gpsLng,
+          'refusSignature': interp.signatureRefused,
+          'verbaliseLe': now,
+        };
+      }).toList();
+
+      if (bodies.isEmpty) {
+        // Pas d'infractions sélectionnées — improbable mais on gère
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      final fines = await FineRepository().createBatch(bodies);
+      if (mounted) {
+        setState(() {
+          _createdFines = fines;
+          _isSubmitting = false;
+        });
+        _checkController.forward();
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submitError = true;
+          _submitErrorMsg = e.message;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submitError = true;
+          _submitErrorMsg = 'Erreur réseau. Vérifiez votre connexion.';
+        });
+      }
+    }
   }
 
   bool _isPdfLoading = false;
@@ -70,6 +139,71 @@ class _InterpellationConfirmationScreenState
     final total = interp.totalAmount;
     final formattedTotal = _fmt(total);
     final isRefusal = interp.signatureRefused;
+
+    // ── Loading / Error ──────────────────────────────────────────────────────
+    if (_isSubmitting) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: AppColors.primary),
+                const SizedBox(height: 24),
+                Text('Enregistrement du PV…',
+                    style: AppTextStyles.titleSmall
+                        .copyWith(color: AppColors.textTertiary)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_submitError) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.wifi_off_rounded,
+                    size: 56, color: AppColors.error),
+                const SizedBox(height: 20),
+                Text('Échec de l\'enregistrement',
+                    style: AppTextStyles.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  _submitErrorMsg ?? 'Une erreur est survenue.',
+                  style: AppTextStyles.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                PremiumButton(
+                  label: 'Réessayer',
+                  icon: Icons.refresh_rounded,
+                  onPressed: _submitPv,
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => context.go('/police'),
+                  child: const Text('Abandonner',
+                      style: TextStyle(color: AppColors.textTertiary)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Référence du 1er PV créé (ou fallback local)
+    final mainRef = _createdFines.isNotEmpty
+        ? _createdFines.first.reference
+        : 'PV-${DateTime.now().year}-${_refSuffix()}';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -107,54 +241,53 @@ class _InterpellationConfirmationScreenState
               const SizedBox(height: 28),
 
               // ── Reference card ────────────────────────────────────
-              Builder(builder: (ctx) {
-                final ref2 = 'CP-${DateTime.now().year}-${_refSuffix()}';
-                return Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Column(
-                    children: [
-                      _ConfirmRow(label: 'Référence', value: ref2),
-                      const Divider(height: 20, color: AppColors.divider),
-                      _ConfirmRow(
-                        label: 'Conducteur',
-                        value: interp.driverName.isNotEmpty ? interp.driverName : '—',
-                      ),
-                      const Divider(height: 20, color: AppColors.divider),
-                      _ConfirmRow(
-                        label: 'Véhicule',
-                        value: interp.vehiclePlate.isNotEmpty
-                            ? '${interp.vehicleBrand} — ${interp.vehiclePlate}'
-                            : '—',
-                      ),
-                      const Divider(height: 20, color: AppColors.divider),
-                      _ConfirmRow(
-                        label: 'Infractions',
-                        value:
-                            '${interp.selectedInfractions.length} infraction${interp.selectedInfractions.length > 1 ? 's' : ''}',
-                      ),
-                      const Divider(height: 20, color: AppColors.divider),
-                      _ConfirmRow(
-                        label: 'Montant',
-                        value: '$formattedTotal FCFA',
-                        valueColor: AppColors.primary,
-                      ),
-                      const Divider(height: 20, color: AppColors.divider),
-                      const _ConfirmRow(label: 'Délai', value: '30 jours'),
-                      const Divider(height: 20, color: AppColors.divider),
-                      _ConfirmRow(
-                        label: 'Horodatage',
-                        value: _formatNow(),
-                        valueStyle: AppTextStyles.mono.copyWith(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                );
-              }).animate().fadeIn(delay: 1000.ms),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Column(
+                  children: [
+                    _ConfirmRow(label: 'Référence', value: mainRef),
+                    const Divider(height: 20, color: AppColors.divider),
+                    _ConfirmRow(
+                      label: 'Conducteur',
+                      value: interp.driverName.isNotEmpty
+                          ? interp.driverName
+                          : '—',
+                    ),
+                    const Divider(height: 20, color: AppColors.divider),
+                    _ConfirmRow(
+                      label: 'Véhicule',
+                      value: interp.vehiclePlate.isNotEmpty
+                          ? '${interp.vehicleBrand} — ${interp.vehiclePlate}'
+                          : '—',
+                    ),
+                    const Divider(height: 20, color: AppColors.divider),
+                    _ConfirmRow(
+                      label: 'PV créé(s)',
+                      value:
+                          '${_createdFines.isNotEmpty ? _createdFines.length : interp.selectedInfractions.length} PV',
+                    ),
+                    const Divider(height: 20, color: AppColors.divider),
+                    _ConfirmRow(
+                      label: 'Montant total',
+                      value: '$formattedTotal FCFA',
+                      valueColor: AppColors.primary,
+                    ),
+                    const Divider(height: 20, color: AppColors.divider),
+                    const _ConfirmRow(label: 'Délai', value: '30 jours'),
+                    const Divider(height: 20, color: AppColors.divider),
+                    _ConfirmRow(
+                      label: 'Horodatage',
+                      value: _formatNow(),
+                      valueStyle: AppTextStyles.mono.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ).animate().fadeIn(delay: 1000.ms),
 
               const SizedBox(height: 16),
 
@@ -235,7 +368,9 @@ class _InterpellationConfirmationScreenState
                           ? null
                           : () => _printPdf(
                                 interp,
-                                'CP-${DateTime.now().year}-${_refSuffix()}',
+                                _createdFines.isNotEmpty
+                                    ? _createdFines.first.reference
+                                    : 'PV-${DateTime.now().year}-${_refSuffix()}',
                               ),
                     ),
                   ),

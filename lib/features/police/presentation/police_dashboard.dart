@@ -525,10 +525,10 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
             const SizedBox(width: 12),
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.map_outlined,
-                label: 'Zones\nActives',
-                color: AppColors.warning,
-                onTap: () {},
+                icon: Icons.badge_outlined,
+                label: 'Ma\nCarte',
+                color: AppColors.gold,
+                onTap: () => context.push('/police/id-card'),
               ),
             ),
             const SizedBox(width: 12),

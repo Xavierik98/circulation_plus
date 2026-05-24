@@ -10,6 +10,7 @@ import '../features/police/presentation/police_shell.dart';
 import '../features/police/presentation/police_dashboard.dart';
 import '../features/police/presentation/driver_history_screen.dart';
 import '../features/police/presentation/police_notifications_screen.dart';
+import '../features/police/presentation/police_id_card_screen.dart';
 import '../features/police/presentation/interpellation/scan_screen.dart';
 import '../features/police/presentation/interpellation/ocr_preview_screen.dart';
 import '../features/police/presentation/interpellation/interpellation_location_screen.dart';
@@ -177,6 +178,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/police/confirmation',
         builder: (_, __) => const InterpellationConfirmationScreen(),
+      ),
+      GoRoute(
+        path: '/police/id-card',
+        builder: (_, __) => const PoliceIdCardScreen(),
       ),
       GoRoute(
         path: '/police/settings',

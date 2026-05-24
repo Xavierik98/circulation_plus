@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/officer_model.dart';
@@ -317,6 +318,15 @@ class _OfficerCard extends StatelessWidget {
   final OfficerModel officer;
   const _OfficerCard({required this.officer});
 
+  void _showActivitySheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _OfficerActivitySheet(officer: officer),
+    );
+  }
+
   void _showSanctionSheet(BuildContext context) {
     String? selectedType;
     final motifCtrl = TextEditingController();
@@ -535,6 +545,25 @@ class _OfficerCard extends StatelessWidget {
                     ),
                   const SizedBox(height: 4),
                   GestureDetector(
+                    onTap: () => _showActivitySheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: AppColors.info.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'Historique',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.info),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
                     onTap: () => _showSanctionSheet(context),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -687,6 +716,322 @@ class _CredentialTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Officer Activity Bottom Sheet ─────────────────────────────────────────────
+
+class _OfficerActivitySheet extends StatefulWidget {
+  final OfficerModel officer;
+  const _OfficerActivitySheet({required this.officer});
+
+  @override
+  State<_OfficerActivitySheet> createState() => _OfficerActivitySheetState();
+}
+
+class _OfficerActivitySheetState extends State<_OfficerActivitySheet> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _items = [];
+  int _total = 0;
+  int _page = 1;
+  bool _hasMore = true;
+
+  static final _dayFmt = DateFormat('d MMM yyyy', 'fr_FR');
+  static final _timeFmt = DateFormat('HH:mm:ss', 'fr_FR');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPage();
+  }
+
+  Future<void> _loadPage() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final data = await OfficerRepository().getActivity(
+        widget.officer.id,
+        page: _page,
+        limit: 30,
+      );
+      final newItems = (data['items'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      _total = (data['total'] as num).toInt();
+      setState(() {
+        _items = _page == 1 ? newItems : [..._items, ...newItems];
+        _hasMore = _items.length < _total;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (!_hasMore || _loading) return;
+    _page++;
+    await _loadPage();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.cardBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.history_rounded, color: AppColors.info, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Historique de connexion', style: AppTextStyles.titleSmall),
+                        Text(widget.officer.fullName,
+                            style: AppTextStyles.caption, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  if (_total > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text('$_total entrées',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.primary)),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: AppColors.divider),
+            // Content
+            Expanded(
+              child: _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline_rounded,
+                              color: AppColors.error, size: 40),
+                          const SizedBox(height: 8),
+                          Text('Impossible de charger l\'historique',
+                              style: AppTextStyles.bodyMedium),
+                          const SizedBox(height: 4),
+                          Text(_error!, style: AppTextStyles.caption, textAlign: TextAlign.center),
+                          const SizedBox(height: 16),
+                          TextButton.icon(
+                            onPressed: () { _page = 1; _loadPage(); },
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Réessayer'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _loading && _items.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : _items.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.login_rounded,
+                                      size: 48, color: AppColors.textTertiary.withValues(alpha: 0.5)),
+                                  const SizedBox(height: 8),
+                                  Text('Aucune connexion enregistrée',
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                          color: AppColors.textTertiary)),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollCtrl,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              itemCount: _items.length + (_hasMore ? 1 : 0),
+                              itemBuilder: (ctx, i) {
+                                if (i == _items.length) {
+                                  return _loading
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(16),
+                                          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                        )
+                                      : TextButton(
+                                          onPressed: _loadMore,
+                                          child: const Text('Charger plus'),
+                                        );
+                                }
+                                return _ActivityEventTile(
+                                  item: _items[i],
+                                  dayFmt: _dayFmt,
+                                  timeFmt: _timeFmt,
+                                  showDateHeader: i == 0 ||
+                                      !_isSameDay(_items[i], _items[i - 1]),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isSameDay(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final da = DateTime.tryParse(a['createdAt'] as String? ?? '')?.toLocal();
+    final db = DateTime.tryParse(b['createdAt'] as String? ?? '')?.toLocal();
+    if (da == null || db == null) return false;
+    return da.year == db.year && da.month == db.month && da.day == db.day;
+  }
+}
+
+class _ActivityEventTile extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final DateFormat dayFmt;
+  final DateFormat timeFmt;
+  final bool showDateHeader;
+
+  const _ActivityEventTile({
+    required this.item,
+    required this.dayFmt,
+    required this.timeFmt,
+    required this.showDateHeader,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final action = item['action'] as String? ?? '';
+    final isLogin = action == 'LOGIN';
+    final dt = DateTime.tryParse(item['createdAt'] as String? ?? '')?.toLocal();
+    final ip = item['ip'] as String? ?? '—';
+    final lat = item['lat'] as double?;
+    final lng = item['lng'] as double?;
+    final hasGps = lat != null && lng != null;
+
+    final color = isLogin ? AppColors.success : AppColors.warning;
+    final icon = isLogin ? Icons.login_rounded : Icons.logout_rounded;
+    final label = isLogin ? 'Connexion' : 'Déconnexion';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Date header separator
+        if (showDateHeader) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(
+              children: [
+                const Expanded(child: Divider(color: AppColors.divider)),
+                const SizedBox(width: 8),
+                Text(
+                  dt != null ? dayFmt.format(dt) : '—',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: Divider(color: AppColors.divider)),
+              ],
+            ),
+          ),
+        ],
+        // Event row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 12),
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(label,
+                            style: AppTextStyles.labelSmall.copyWith(color: color)),
+                        const Spacer(),
+                        Text(
+                          dt != null ? timeFmt.format(dt) : '—',
+                          style: AppTextStyles.mono.copyWith(
+                              fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(Icons.computer_rounded,
+                            size: 11, color: AppColors.textTertiary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(ip,
+                              style: AppTextStyles.mono.copyWith(
+                                  fontSize: 10, color: AppColors.textTertiary),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                    if (hasGps) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded,
+                              size: 11, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                            style: AppTextStyles.mono.copyWith(
+                                fontSize: 10, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

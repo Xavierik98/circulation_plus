@@ -249,6 +249,18 @@ class OfficerRepository {
   Future<Map<String, dynamic>> importCsv(String csvContent) async =>
       await _api.post('/api/officers/import-csv',
           body: {'csvContent': csvContent}) as Map<String, dynamic>;
+
+  /// Historique connexions/déconnexions d'un agent.
+  /// Retourne { items: [...], total }.
+  Future<Map<String, dynamic>> getActivity(
+    String officerId, {
+    int page = 1,
+    int limit = 50,
+  }) async =>
+      await _api.get('/api/officers/$officerId/activity', query: {
+        'page': page,
+        'limit': limit,
+      }) as Map<String, dynamic>;
 }
 
 class PaymentRepository {

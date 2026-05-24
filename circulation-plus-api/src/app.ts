@@ -27,6 +27,7 @@ import { statusRoutes } from './modules/officers/status.routes';
 import { sanctionsRoutes } from './modules/sanctions/sanctions.routes';
 import { notificationsRoutes } from './modules/notifications/notifications.routes';
 import { statsRoutes } from './modules/stats/stats.routes';
+import { commissariatsRoutes } from './modules/commissariats/commissariats.routes';
 import { registerStubRoutes } from './modules/payments/stub.routes';
 import { startConvocationCron } from './modules/convocations/convocations.cron';
 
@@ -191,6 +192,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(sanctionsRoutes, { prefix: '/api/officers' });
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });
   await app.register(statsRoutes, { prefix: '/api/stats' });
+  await app.register(commissariatsRoutes, { prefix: '/api/commissariats' });
 
   if (!isTest) {
     startConvocationCron(app);

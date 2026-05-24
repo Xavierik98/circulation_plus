@@ -68,15 +68,19 @@ OfficerModel officerFromJson(Map<String, dynamic> j) {
   final firstName = parts.first;
   final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
   final actif = j['actif'] as bool? ?? true;
+  final grade = gradeFromString(j['grade'] as String?);
+  final dept = j['departement'] as String?;
+  // Zone = departement lisible ou commissariatId, pour affichage dans l'UI.
+  final zone = dept != null ? _deptLabel(dept) : '—';
 
   return OfficerModel(
     id: j['id'] as String,
     badgeNumber: j['badgeNumber'] as String? ?? '',
     firstName: firstName,
     lastName: lastName,
-    rank: 'Agent',
+    rank: gradeLabel(grade),
     unit: 'Police Nationale',
-    zone: '—',
+    zone: zone,
     phone: j['telephone'] as String? ?? '',
     avatarInitials:
         '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}',
@@ -90,7 +94,31 @@ OfficerModel officerFromJson(Map<String, dynamic> j) {
     lastLat: (j['lastLat'] as num?)?.toDouble(),
     lastLng: (j['lastLng'] as num?)?.toDouble(),
     lastSeenAt: _dateOrNull(j['lastSeenAt']),
+    grade: grade,
+    niveauHierarchique: niveauFromString(j['niveauHierarchique'] as String?),
+    commissariatId: j['commissariatId'] as String?,
+    departement: dept,
+    email: j['email'] as String?,
+    mustChangePassword: j['mustChangePassword'] as bool? ?? false,
   );
+}
+
+String _deptLabel(String dept) {
+  switch (dept) {
+    case 'BRAZZAVILLE':   return 'Brazzaville';
+    case 'POINTE_NOIRE':  return 'Pointe-Noire';
+    case 'POOL':          return 'Pool';
+    case 'BOUENZA':       return 'Bouenza';
+    case 'NIARI':         return 'Niari';
+    case 'LEKOUMOU':      return 'Lékoumou';
+    case 'KOUILOU':       return 'Kouilou';
+    case 'PLATEAUX':      return 'Plateaux';
+    case 'CUVETTE':       return 'Cuvette';
+    case 'CUVETTE_OUEST': return 'Cuvette-Ouest';
+    case 'SANGHA':        return 'Sangha';
+    case 'LIKOUALA':      return 'Likouala';
+    default:              return dept;
+  }
 }
 
 NotificationType _notifType(String? t) {

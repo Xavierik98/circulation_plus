@@ -1,11 +1,88 @@
 enum OfficerStatus { active, inactive, suspended }
 
+/// Grades PNC — reflète l'enum GradePNC du backend.
+enum GradePNC {
+  directeurGeneral,
+  directeurGeneralAdjoint,
+  directeurCentral,
+  directeurDepartemental,
+  commissaireDivisionnaire,
+  commissairePrincipal,
+  commissaire,
+  inspecteurPrincipal,
+  inspecteur,
+  brigadierChef,
+  brigadier,
+  gardienDeLaPaix1cl,
+  gardienDeLaPaix2cl,
+  unknown,
+}
+
+GradePNC gradeFromString(String? s) {
+  switch (s) {
+    case 'DIRECTEUR_GENERAL':            return GradePNC.directeurGeneral;
+    case 'DIRECTEUR_GENERAL_ADJOINT':    return GradePNC.directeurGeneralAdjoint;
+    case 'DIRECTEUR_CENTRAL':            return GradePNC.directeurCentral;
+    case 'DIRECTEUR_DEPARTEMENTAL':      return GradePNC.directeurDepartemental;
+    case 'COMMISSAIRE_DIVISIONNAIRE':    return GradePNC.commissaireDivisionnaire;
+    case 'COMMISSAIRE_PRINCIPAL':        return GradePNC.commissairePrincipal;
+    case 'COMMISSAIRE':                  return GradePNC.commissaire;
+    case 'INSPECTEUR_PRINCIPAL':         return GradePNC.inspecteurPrincipal;
+    case 'INSPECTEUR':                   return GradePNC.inspecteur;
+    case 'BRIGADIER_CHEF':               return GradePNC.brigadierChef;
+    case 'BRIGADIER':                    return GradePNC.brigadier;
+    case 'GARDIEN_DE_LA_PAIX_1CL':      return GradePNC.gardienDeLaPaix1cl;
+    case 'GARDIEN_DE_LA_PAIX_2CL':      return GradePNC.gardienDeLaPaix2cl;
+    default:                             return GradePNC.unknown;
+  }
+}
+
+String gradeLabel(GradePNC grade) {
+  switch (grade) {
+    case GradePNC.directeurGeneral:          return 'Directeur Général';
+    case GradePNC.directeurGeneralAdjoint:   return 'Directeur Général Adjoint';
+    case GradePNC.directeurCentral:          return 'Directeur Central';
+    case GradePNC.directeurDepartemental:    return 'Directeur Départemental';
+    case GradePNC.commissaireDivisionnaire:  return 'Commissaire Divisionnaire';
+    case GradePNC.commissairePrincipal:      return 'Commissaire Principal';
+    case GradePNC.commissaire:               return 'Commissaire';
+    case GradePNC.inspecteurPrincipal:       return 'Inspecteur Principal';
+    case GradePNC.inspecteur:                return 'Inspecteur';
+    case GradePNC.brigadierChef:             return 'Brigadier-Chef';
+    case GradePNC.brigadier:                 return 'Brigadier';
+    case GradePNC.gardienDeLaPaix1cl:        return 'Gardien de la Paix 1ère Cl.';
+    case GradePNC.gardienDeLaPaix2cl:        return 'Gardien de la Paix 2ème Cl.';
+    case GradePNC.unknown:                   return 'Agent PNC';
+  }
+}
+
+/// Niveau hiérarchique fonctionnel — reflète l'enum NiveauHierarchique du backend.
+enum NiveauHierarchique {
+  directionGenerale,
+  directionDept,
+  commissariatCentral,
+  commissariatZone,
+  agent,
+  unknown,
+}
+
+NiveauHierarchique niveauFromString(String? s) {
+  switch (s) {
+    case 'DIRECTION_GENERALE':    return NiveauHierarchique.directionGenerale;
+    case 'DIRECTION_DEPT':        return NiveauHierarchique.directionDept;
+    case 'COMMISSARIAT_CENTRAL':  return NiveauHierarchique.commissariatCentral;
+    case 'COMMISSARIAT_ZONE':     return NiveauHierarchique.commissariatZone;
+    case 'AGENT':                 return NiveauHierarchique.agent;
+    default:                      return NiveauHierarchique.unknown;
+  }
+}
+
 class OfficerModel {
   final String id;
   final String badgeNumber;
   final String firstName;
   final String lastName;
-  final String rank;
+  final String rank;           // Label lisible (ex: "Inspecteur Principal")
   final String unit;
   final String zone;
   final String phone;
@@ -20,6 +97,13 @@ class OfficerModel {
   final double? lastLat;
   final double? lastLng;
   final DateTime? lastSeenAt;
+  // ── Champs hiérarchiques (depuis le backend v2) ───────────────────────────
+  final GradePNC grade;
+  final NiveauHierarchique niveauHierarchique;
+  final String? commissariatId;
+  final String? departement;
+  final String? email;
+  final bool mustChangePassword;
 
   const OfficerModel({
     required this.id,
@@ -41,9 +125,15 @@ class OfficerModel {
     this.lastLat,
     this.lastLng,
     this.lastSeenAt,
+    this.grade = GradePNC.unknown,
+    this.niveauHierarchique = NiveauHierarchique.agent,
+    this.commissariatId,
+    this.departement,
+    this.email,
+    this.mustChangePassword = false,
   });
 
-  String get fullName => '$firstName $lastName';
+  String get fullName => '$firstName $lastName'.trim();
 
   static final List<OfficerModel> mockOfficers = [
     OfficerModel(

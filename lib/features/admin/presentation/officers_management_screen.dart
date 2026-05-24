@@ -610,13 +610,35 @@ class _OfficerCard extends StatelessWidget {
             children: [
               const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textTertiary),
               const SizedBox(width: 4),
-              Text(officer.zone, style: AppTextStyles.caption),
-              const Spacer(),
-              const Icon(Icons.phone_outlined, size: 12, color: AppColors.textTertiary),
-              const SizedBox(width: 4),
-              Text(officer.phone, style: AppTextStyles.caption),
+              Expanded(child: Text(officer.zone, style: AppTextStyles.caption, overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 8),
+              if (officer.phone.isNotEmpty) ...[
+                const Icon(Icons.phone_outlined, size: 12, color: AppColors.textTertiary),
+                const SizedBox(width: 4),
+                Text(officer.phone, style: AppTextStyles.caption),
+              ],
             ],
           ),
+          if (officer.mustChangePassword) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.key_rounded, size: 11, color: AppColors.warning),
+                  const SizedBox(width: 4),
+                  Text('Doit changer son mot de passe',
+                      style: AppTextStyles.caption.copyWith(color: AppColors.warning)),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

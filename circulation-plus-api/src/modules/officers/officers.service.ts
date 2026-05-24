@@ -27,6 +27,11 @@ export interface OfficerWithStats {
   lastSeenAt: Date | null;
   totalFines: number;
   montantCollecte: number;
+  // Champs hiérarchiques
+  grade: string | null;
+  niveauHierarchique: string;
+  commissariatId: string | null;
+  departement: string | null;
 }
 
 // ── Génère un mot de passe temporaire fort (ISO 27001) ─────────────────────
@@ -143,6 +148,11 @@ export async function listOfficers(
         lastSeenAt: officer.lastSeenAt,
         totalFines,
         montantCollecte: collected._sum.montantTotal ?? 0,
+        // Champs hiérarchiques
+        grade: (officer as Record<string, unknown>)['grade'] as string | null ?? null,
+        niveauHierarchique: (officer as Record<string, unknown>)['niveauHierarchique'] as string ?? 'AGENT',
+        commissariatId: officer.commissariatId ?? null,
+        departement: (officer as Record<string, unknown>)['departement'] as string | null ?? null,
       };
     }),
   );

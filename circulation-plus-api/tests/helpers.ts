@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import type { Role } from '@prisma/client';
+import type { Role, NiveauHierarchique, Departement } from '@prisma/client';
 import { buildApp } from '../src/app';
 import { prisma } from '../src/config/database';
 
@@ -16,16 +16,25 @@ export async function createUser(params: {
   name?: string;
   badgeNumber?: string;
   telephone?: string;
+  niveauHierarchique?: NiveauHierarchique;
+  departement?: Departement;
+  commissariatId?: string;
 }) {
-  const pinHash = await bcrypt.hash(params.pin ?? '0000', 12);
-  return prisma.user.create({
-    data: {
+  // Use cost 4 in tests for speed (still valid bcrypt, just faster).
+  const pinHash = await bcrypt.hash(params.pin ?? '0000', 4);
+  return prisma.user.upsert({
+    where: { email: params.email },
+    update: {},
+    create: {
       email: params.email,
       pinHash,
       role: params.role,
       name: params.name ?? params.email,
       badgeNumber: params.badgeNumber ?? null,
       telephone: params.telephone ?? null,
+      niveauHierarchique: params.niveauHierarchique ?? 'AGENT',
+      departement: params.departement ?? null,
+      commissariatId: params.commissariatId ?? null,
     },
   });
 }

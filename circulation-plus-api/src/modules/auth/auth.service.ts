@@ -98,6 +98,10 @@ function publicUser(user: User): {
   actif: boolean;
   mustChangePassword: boolean;
   emailVerified: boolean;
+  grade: string | null;
+  niveauHierarchique: string;
+  commissariatId: string | null;
+  departement: string | null;
 } {
   return {
     id: user.id,
@@ -110,6 +114,10 @@ function publicUser(user: User): {
     actif: user.actif,
     mustChangePassword: user.mustChangePassword,
     emailVerified: user.emailVerified,
+    grade: (user as Record<string, unknown>)['grade'] as string | null ?? null,
+    niveauHierarchique: (user as Record<string, unknown>)['niveauHierarchique'] as string ?? 'AGENT',
+    commissariatId: (user as Record<string, unknown>)['commissariatId'] as string | null ?? null,
+    departement: (user as Record<string, unknown>)['departement'] as string | null ?? null,
   };
 }
 
@@ -237,11 +245,17 @@ export async function logout(
 }
 
 // Révoque TOUS les refresh tokens d'un utilisateur (ex : agent désactivé).
+// Utilise SCAN au lieu de KEYS pour éviter de bloquer l'event loop Redis (O(N) global).
 export async function revokeAllRefreshTokens(userId: string): Promise<void> {
-  const keys = await redis.keys(`refresh:${userId}:*`);
-  if (keys.length > 0) {
-    await redis.del(...keys);
-  }
+  const pattern = `refresh:${userId}:*`;
+  let cursor = '0';
+  do {
+    const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', '100');
+    cursor = next;
+    if (keys.length > 0) {
+      await redis.del(...(keys as string[]));
+    }
+  } while (cursor !== '0');
 }
 
 // Inscription citoyen — auto-inscription publique (rôle CITOYEN uniquement).

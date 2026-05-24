@@ -7,6 +7,7 @@ import { audit } from '../../shared/middleware/audit';
 import { revokeAllRefreshTokens } from '../auth/auth.service';
 import { sendCredentialsEmail } from '../../config/email';
 import type { CreateOfficerBody, UpdateOfficerBody } from './officers.schema';
+import type { AuthUser } from '../../types/fastify';
 
 const PIN_ROUNDS = 12;
 const PNC_DOMAIN = '@pnc.cg';
@@ -50,13 +51,56 @@ function generateTempPassword(): string {
   return base.join('');
 }
 
+// ── Résoud les commissariats visibles selon le niveau hiérarchique ──────────
+// Renvoie un filtre `commissariatId` à injecter dans une requête Prisma.
+// DIRECTION_GENERALE → pas de filtre (voit tout)
+// DIRECTION_DEPT     → tout le département
+// COMMISSARIAT_CENTRAL → son commissariat + tous les sous-commissariats
+// COMMISSARIAT_ZONE  → son commissariat uniquement
+// AGENT              → son commissariat uniquement (ne devrait pas appeler cette fonction)
+async function buildHierarchyFilter(
+  admin: AuthUser,
+): Promise<Prisma.UserWhereInput> {
+  const { niveauHierarchique, commissariatId, departement } = admin;
+
+  switch (niveauHierarchique) {
+    case 'DIRECTION_GENERALE':
+      return {}; // Voit tout
+
+    case 'DIRECTION_DEPT':
+      if (departement) {
+        return { departement };
+      }
+      return {}; // Si pas de département configuré, fallback tout voir
+
+    case 'COMMISSARIAT_CENTRAL': {
+      if (!commissariatId) return {};
+      // Récupère tous les sous-commissariats (1 niveau de profondeur)
+      const subs = await prisma.commissariat.findMany({
+        where: { parentId: commissariatId, actif: true },
+        select: { id: true },
+      });
+      const ids = [commissariatId, ...subs.map((s) => s.id)];
+      return { commissariatId: { in: ids } };
+    }
+
+    case 'COMMISSARIAT_ZONE':
+    case 'AGENT':
+    default:
+      if (commissariatId) {
+        return { commissariatId };
+      }
+      return {};
+  }
+}
+
 // ── Liste paginée ──────────────────────────────────────────────────────────
-export async function listOfficers(params: {
-  page: number;
-  limit: number;
-  search?: string;
-}): Promise<{ items: OfficerWithStats[]; total: number }> {
-  const where: Prisma.UserWhereInput = { role: 'POLICE' };
+export async function listOfficers(
+  params: { page: number; limit: number; search?: string },
+  admin: AuthUser,
+): Promise<{ items: OfficerWithStats[]; total: number }> {
+  const hierarchyFilter = await buildHierarchyFilter(admin);
+  const where: Prisma.UserWhereInput = { role: 'POLICE', ...hierarchyFilter };
   if (params.search) {
     where.OR = [
       { name: { contains: params.search, mode: 'insensitive' } },

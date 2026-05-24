@@ -31,7 +31,7 @@ export async function officersRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const { page, limit, search } = request.query;
-      const { items, total } = await listOfficers({ page, limit, search });
+      const { items, total } = await listOfficers({ page, limit, search }, request.user!);
       return ok(paginated(items, total, page, limit));
     },
   );

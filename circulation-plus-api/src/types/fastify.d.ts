@@ -1,4 +1,4 @@
-import type { Role } from '@prisma/client';
+import type { Role, NiveauHierarchique, Departement } from '@prisma/client';
 import type { Adapters } from '../adapters/types';
 
 export interface AuthUser {
@@ -6,6 +6,10 @@ export interface AuthUser {
   role: Role;
   name: string;
   badgeNumber: string | null;
+  mustChangePassword: boolean;
+  niveauHierarchique: NiveauHierarchique;
+  commissariatId: string | null;
+  departement: Departement | null;
 }
 
 declare module 'fastify' {

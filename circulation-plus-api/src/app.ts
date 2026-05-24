@@ -51,7 +51,24 @@ export async function buildApp(): Promise<FastifyInstance> {
   // { success, data } sur toutes les réponses, y compris les erreurs.
   app.setValidatorCompiler(validatorCompiler);
 
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(helmet, {
+    // CSP : API REST — uniquement les pages HTML d'auth (verify-email, reset-password)
+    // sont servies au navigateur. Politique stricte : pas de scripts inline, pas de
+    // ressources externes inconnues.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // Les pages HTML d'auth n'embarquent que des styles inline (reset form).
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        scriptSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        frameSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  });
   await app.register(cors, {
     origin: env.CORS_ORIGINS === '*' ? true : env.CORS_ORIGINS.split(',').map((o) => o.trim()),
     credentials: true,

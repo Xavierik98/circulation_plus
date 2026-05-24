@@ -5,6 +5,7 @@ import { authenticate } from '../../shared/middleware/authenticate';
 import { authorize } from '../../shared/middleware/authorize';
 import { generateFinePdf, type FinePdfData } from '../../shared/utils/pdf';
 import { env } from '../../config/env';
+import { LOGIN_RATE_LIMIT } from '../../shared/middleware/rateLimit';
 import { initiatePayment } from '../payments/payments.service';
 import {
   finesQuerySchema,
@@ -54,14 +55,16 @@ export async function finesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // GET /api/fines/:reference/verify — PUBLIC (cible du QR code).
+  // GET /api/fines/:reference/verify -- PUBLIC (cible du QR code).
+  // Rate-limited : protege contre l’enumeration sequentielle des references PV.
   r.get(
-    '/:reference/verify',
+    "/:reference/verify",
     {
+      config: { rateLimit: LOGIN_RATE_LIMIT },
       schema: {
-        tags: ['Contraventions'],
-        summary: 'Vérification publique d’un PV (QR code)',
-        description: 'PUBLIC. Données non sensibles uniquement.',
+        tags: ["Contraventions"],
+        summary: "Verification publique d’un PV (QR code)",
+        description: "PUBLIC. Donnees non sensibles uniquement. Limite a 10 req/min/IP.",
         params: fineReferenceParamsSchema,
       },
     },

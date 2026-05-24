@@ -1,3 +1,5 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_constants.dart';
@@ -109,6 +111,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   final AuthRepository _repo;
 
+  /// Récupère le token FCM et l'envoie au backend.
+  /// Non-bloquant : toute erreur (Firebase non configuré, réseau) est ignorée.
+  Future<void> _pushFcmToken() async {
+    try {
+      // Demander la permission sur iOS (ignoré sur Android < 13).
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+
+      final token = await messaging.getToken();
+      if (token != null && token.isNotEmpty) {
+        await _repo.updateFcmToken(token);
+        debugPrint('[FCM] Token enregistré : ${token.substring(0, 10)}…');
+      }
+
+      // Écouter les renouvellements automatiques de token.
+      messaging.onTokenRefresh.listen((newToken) {
+        _repo.updateFcmToken(newToken).catchError((_) {});
+      });
+    } catch (e) {
+      // Firebase non configuré (placeholder) ou autre erreur — non bloquant.
+      debugPrint('[FCM] Impossible d\'enregistrer le token : $e');
+    }
+  }
+
   Future<void> _restore() async {
     if (!await _repo.hasSession()) return;
     try {
@@ -125,6 +156,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
         emailVerified: user['emailVerified'] as bool? ?? true,
       );
+      // Enregistrer le token FCM pour les notifications push.
+      _pushFcmToken();
     } catch (_) {
       // Session invalide : on reste déconnecté.
       await _repo.logout();
@@ -163,6 +196,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         mustChangePassword: user['mustChangePassword'] as bool? ?? false,
         emailVerified: user['emailVerified'] as bool? ?? true,
       );
+      // Enregistrer le token FCM pour les notifications push.
+      _pushFcmToken();
       return true;
     } on ApiException catch (e) {
       // Erreur réseau (backend injoignable) → mode démo offline
@@ -237,6 +272,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         emailVerified: isVerified, // Vrai en dev (auto-vérifié), false en prod
         verificationUrl: devUrl.isNotEmpty ? devUrl : null,
       );
+      // Enregistrer le token FCM pour les notifications push.
+      _pushFcmToken();
       return devUrl; // '' = auto-vérifié (dev) ou SMTP ok, non-vide = lien direct stub
     } on ApiException catch (e) {
       if (e.code == 'NETWORK_ERROR') {

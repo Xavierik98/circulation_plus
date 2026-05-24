@@ -1,11 +1,35 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 
+/// Handler des messages Firebase reçus en arrière-plan.
+/// Doit être une fonction top-level (pas une méthode de classe).
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Firebase est déjà initialisé par le plugin — pas besoin de ré-appeler initializeApp().
+  // Les données de la notification sont dans message.data et message.notification.
+  debugPrint('[FCM] Message reçu en arrière-plan : ${message.messageId}');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── Firebase ──────────────────────────────────────────────────────────────
+  // Initialisation non-bloquante : l'app fonctionne même si Firebase n'est
+  // pas encore configuré (google-services.json placeholder).
+  try {
+    await Firebase.initializeApp();
+    // Enregistrer le handler pour les messages reçus en background / terminated.
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('[FCM] Firebase non initialisé : $e');
+    // L'application continue sans les notifications push.
+  }
+
+  // ── Orientation & style système ───────────────────────────────────────────
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

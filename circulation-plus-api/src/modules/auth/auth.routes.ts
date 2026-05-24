@@ -146,7 +146,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const { name, email, telephone, pin } = request.body;
-      const result = await register(name, email, telephone, pin, request.ip);
+      const ua = request.headers['user-agent'] ?? null;
+      const result = await register(name, email, telephone, pin, request.ip, ua);
       return ok(result);
     },
   );
@@ -258,7 +259,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const { email, pin, role } = request.body;
-      const result = await login(email, pin, role, request.ip);
+      const ua = request.headers['user-agent'] ?? null;
+      const result = await login(email, pin, role, request.ip, ua);
       return ok(result);
     },
   );
@@ -291,7 +293,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request) => {
-      await logout(request.body.refreshToken);
+      const ua = request.headers['user-agent'] ?? null;
+      await logout(request.body.refreshToken, request.ip, ua);
       return ok({ loggedOut: true });
     },
   );

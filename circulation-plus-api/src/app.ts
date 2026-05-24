@@ -32,6 +32,10 @@ import { startConvocationCron } from './modules/convocations/convocations.cron';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
+    // trustProxy : indispensable derrière nginx / CloudFlare / Render pour que
+    // request.ip contienne l'IP réelle du client (X-Forwarded-For) et non celle
+    // du proxy. Sans cela, tous les logs d'audit enregistrent l'IP du proxy.
+    trustProxy: true,
     logger: isTest
       ? false
       : {
@@ -65,6 +69,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       fail('Trop de requêtes, réessayez plus tard', 'RATE_LIMITED'),
   });
 
+  // Documentation Swagger masquée en production (évite l'exposition de l'API interne).
   await app.register(swagger, {
     openapi: {
       info: {
@@ -83,7 +88,23 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
     transform: jsonSchemaTransform,
   });
-  await app.register(swaggerUi, { routePrefix: '/docs' });
+  await app.register(swaggerUi, {
+    routePrefix: '/docs',
+    // En production : accès restreint (désactivé par défaut, activer via ENABLE_DOCS=true)
+    uiConfig: { docExpansion: 'list', deepLinking: false },
+    // Masquer les routes d'admin en production
+    transformSpecificationClone: isProduction
+      ? true
+      : false,
+  });
+  // Bloquer /docs en production sauf si explicitement activé
+  if (isProduction && process.env['ENABLE_DOCS'] !== 'true') {
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.url.startsWith('/docs')) {
+        reply.status(404).send({ success: false, error: 'Not found', code: 'NOT_FOUND' });
+      }
+    });
+  }
 
   // Bundle d'adaptateurs (réel ou stub selon la configuration).
   const adapters = buildAdapters(app.log);

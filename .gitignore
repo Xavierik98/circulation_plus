@@ -43,3 +43,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ── Firebase / Secrets ────────────────────────────────────────────────────────
+# REMPLACER le placeholder par le vrai fichier téléchargé depuis Firebase Console.
+# Ne JAMAIS commiter le vrai google-services.json (contient des clés API).
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+# Clé de compte de service Firebase Admin (backend)
+**/serviceAccountKey.json
+**/service-account*.json
+# Fichiers .env locaux
+.env
+.env.local
+.env.*.local

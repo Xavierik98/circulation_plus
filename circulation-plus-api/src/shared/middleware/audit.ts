@@ -6,19 +6,21 @@ export interface AuditInput {
   action: string;
   details?: Prisma.InputJsonValue;
   ip?: string | null;
+  userAgent?: string | null;
 }
 
-// Journalisation des actions sensibles : login, création de fine,
-// confirmation de paiement, modification d'agent.
+// Journalisation des actions sensibles : login, logout, création de fine,
+// confirmation de paiement, modification d'agent, connexion/déconnexion.
 export async function audit(prisma: PrismaClient, input: AuditInput): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
-        userId: input.userId ?? null,
-        fineId: input.fineId ?? null,
-        action: input.action,
-        details: input.details,
-        ip: input.ip ?? null,
+        userId:    input.userId    ?? null,
+        fineId:    input.fineId   ?? null,
+        action:    input.action,
+        details:   input.details  ?? undefined,
+        ip:        input.ip       ?? null,
+        userAgent: input.userAgent ?? null,
       },
     });
   } catch {

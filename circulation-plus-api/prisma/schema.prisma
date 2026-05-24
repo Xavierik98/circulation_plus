@@ -13,6 +13,33 @@ enum Role {
   ADMIN
 }
 
+/// Grades de la Police Nationale du Congo (du plus élevé au plus bas).
+/// Source : organigramme officiel PNC / Loi n°14-2004 portant statut de la PNC.
+enum GradePNC {
+  DIRECTEUR_GENERAL            // DG — échelon national (DGPN)
+  DIRECTEUR_GENERAL_ADJOINT    // DGA — DGPN adjoint
+  DIRECTEUR_CENTRAL            // Directeur d'une direction centrale (DCSP, etc.)
+  DIRECTEUR_DEPARTEMENTAL      // Chef d'une Direction Départementale de Sécurité Publique
+  COMMISSAIRE_DIVISIONNAIRE    // Responsable d'un commissariat central
+  COMMISSAIRE_PRINCIPAL        // Adjoint commissariat central ou chef commissariat zone
+  COMMISSAIRE                  // Chef de commissariat de quartier / arrondissement
+  INSPECTEUR_PRINCIPAL         // Officier de police judiciaire senior
+  INSPECTEUR                   // Officier de police judiciaire
+  BRIGADIER_CHEF               // Sous-officier senior
+  BRIGADIER                    // Sous-officier
+  GARDIEN_DE_LA_PAIX_1CL       // Agent de base 1ère classe
+  GARDIEN_DE_LA_PAIX_2CL       // Agent de base 2ème classe (entrée)
+}
+
+/// Niveau hiérarchique fonctionnel (contrôle l'accès aux données dans le système).
+enum NiveauHierarchique {
+  DIRECTION_GENERALE   // Voit tout (national)
+  DIRECTION_DEPT       // Voit son département
+  COMMISSARIAT_CENTRAL // Voit les commissariats sous sa juridiction
+  COMMISSARIAT_ZONE    // Voit son commissariat uniquement
+  AGENT                // Voit ses propres données seulement
+}
+
 /// 12 départements de la République du Congo.
 enum Departement {
   BRAZZAVILLE
@@ -51,6 +78,31 @@ enum ConvocationStatus {
   DEFAULTER
 }
 
+/// Commissariat (de quartier, central ou direction) — unité organisationnelle PNC.
+model Commissariat {
+  id          String              @id @default(uuid())
+  nom         String
+  code        String              @unique // Ex: BZV-MOUNGALI-01
+  departement Departement
+  /// Adresse physique du commissariat.
+  adresse     String?
+  /// Commissariat parent (null = commissariat central ou direction).
+  parentId    String?
+  parent      Commissariat?       @relation("CommissariatHierarchy", fields: [parentId], references: [id])
+  enfants     Commissariat[]      @relation("CommissariatHierarchy")
+  /// GPS du commissariat (pour la carte).
+  lat         Float?
+  lng         Float?
+  actif       Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  agents      User[]
+
+  @@index([departement])
+  @@index([parentId])
+}
+
 model User {
   id          String   @id @default(uuid())
   email       String   @unique
@@ -70,6 +122,13 @@ model User {
   photoUrl    String?
   /// Département d'affectation de l'agent (POLICE uniquement).
   departement Departement?
+  /// Grade officiel PNC de l'agent (POLICE uniquement).
+  grade       GradePNC?
+  /// Niveau hiérarchique fonctionnel : détermine la portée des données visibles.
+  niveauHierarchique NiveauHierarchique @default(AGENT)
+  /// Commissariat d'affectation (POLICE uniquement — null = direction nationale).
+  commissariatId String?
+  commissariat   Commissariat? @relation(fields: [commissariatId], references: [id])
   /// Statut de service de l'agent (En service / Hors service).
   onDuty      Boolean   @default(false)
   lastLat     Float?
@@ -87,6 +146,8 @@ model User {
 
   @@index([email])
   @@index([badgeNumber])
+  @@index([commissariatId])
+  @@index([niveauHierarchique])
 }
 
 model InfractionType {
@@ -292,9 +353,10 @@ model AuditLog {
   fineId String?
   fine   Fine?   @relation(fields: [fineId], references: [id])
 
-  action  String
-  details Json?
-  ip      String?
+  action    String
+  details   Json?
+  ip        String?
+  userAgent String? // User-Agent HTTP — modèle d'appareil, OS, version app
 
   createdAt DateTime @default(now())
 

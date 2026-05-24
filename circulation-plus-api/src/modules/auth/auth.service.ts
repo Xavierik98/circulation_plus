@@ -118,6 +118,7 @@ export async function login(
   pin: string,
   role: 'police' | 'citizen' | 'admin',
   ip: string | null,
+  userAgent?: string | null,
 ): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
   // 0. Domaine @pnc.cg obligatoire pour les agents.
   if (role === 'police' && !email.toLowerCase().endsWith(PNC_DOMAIN)) {
@@ -174,7 +175,13 @@ export async function login(
   const token = signAccessToken(user);
   const refreshToken = await issueRefreshToken(user.id);
 
-  await audit(prisma, { userId: user.id, action: 'LOGIN', ip });
+  await audit(prisma, {
+    userId: user.id,
+    action: 'LOGIN',
+    ip,
+    userAgent: userAgent ?? null,
+    details: { role: user.role, grade: (user as Record<string, unknown>)['grade'] ?? null },
+  });
 
   return { token, refreshToken, user: publicUser(user) };
 }
@@ -206,13 +213,24 @@ export async function refresh(
   return { token, refreshToken: newRefresh };
 }
 
-export async function logout(refreshToken: string): Promise<void> {
+export async function logout(
+  refreshToken: string,
+  ip?: string | null,
+  userAgent?: string | null,
+): Promise<void> {
   try {
     const payload = jwt.verify(
       refreshToken,
       env.JWT_REFRESH_SECRET,
     ) as RefreshPayload;
     await redis.del(refreshKey(payload.sub, payload.jti));
+    // Audit de déconnexion : heure + IP + User-Agent enregistrés
+    await audit(prisma, {
+      userId: payload.sub,
+      action: 'LOGOUT',
+      ip: ip ?? null,
+      userAgent: userAgent ?? null,
+    });
   } catch {
     // Token déjà invalide / expiré : logout idempotent.
   }
@@ -233,6 +251,7 @@ export async function register(
   telephone: string,
   pin: string,
   ip: string | null,
+  userAgent?: string | null,
 ): Promise<{
   token: string;
   refreshToken: string;
@@ -283,7 +302,7 @@ export async function register(
   const token = signAccessToken(user);
   const refreshToken = await issueRefreshToken(user.id);
 
-  await audit(prisma, { userId: user.id, action: 'REGISTER', ip });
+  await audit(prisma, { userId: user.id, action: 'REGISTER', ip, userAgent: userAgent ?? null });
 
   let verificationUrl: string | undefined;
 

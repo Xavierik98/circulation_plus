@@ -1,7 +1,18 @@
 node_modules
 dist
 .env
+.env.local
+.env.*.local
 coverage
 .storage-stub
 *.log
 .DS_Store
+
+# ── Clés sensibles ────────────────────────────────────────────────────────────
+# Clé de compte de service Firebase Admin SDK
+serviceAccountKey.json
+service-account*.json
+# Certificats TLS locaux
+*.pem
+*.key
+*.crt

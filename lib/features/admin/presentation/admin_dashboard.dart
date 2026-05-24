@@ -9,6 +9,7 @@ import '../../../shared/widgets/stat_card.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/pnc_badge.dart';
 import '../../../data/providers.dart';
+import '../../../features/auth/providers/auth_provider.dart';
 
 class AdminDashboard extends ConsumerWidget {
   const AdminDashboard({super.key});
@@ -17,12 +18,13 @@ class AdminDashboard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(adminStatsProvider);
     final stats = statsAsync.valueOrNull;
+    final auth = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          _buildAppBar(context),
+          _buildAppBar(context, auth),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
@@ -48,7 +50,7 @@ class AdminDashboard extends ConsumerWidget {
     );
   }
 
-  SliverAppBar _buildAppBar(BuildContext context) {
+  SliverAppBar _buildAppBar(BuildContext context, AuthState auth) {
     return SliverAppBar(
       pinned: true,
       backgroundColor: AppColors.surface,
@@ -63,12 +65,13 @@ class AdminDashboard extends ConsumerWidget {
             children: [
               Text('Circulation+', style: AppTextStyles.titleSmall),
               Text(
-                'ADMINISTRATION NATIONALE',
+                auth.userName?.toUpperCase() ?? 'ADMINISTRATION PNC',
                 style: AppTextStyles.caption.copyWith(
                   color: AppColors.gold,
                   fontSize: 9,
                   letterSpacing: 1.5,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

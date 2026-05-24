@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/api_client.dart';
@@ -175,6 +176,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await prefs.setString(AppConstants.prefUserEmail, user['email'] as String? ?? '');
   }
 
+  /// Tente de recuperer les coordonnees GPS actuelles.
+  /// Non-bloquant : retourne null si permission refusee, GPS indisponible ou timeout.
+  Future<({double lat, double lng})?> _getPosition() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+      return (lat: pos.latitude, lng: pos.longitude);
+    } catch (_) {
+      // GPS non disponible, permission manquante, ou timeout — connexion continue.
+      return null;
+    }
+  }
+
   Future<bool> login({
     required UserRole role,
     required String email,
@@ -182,8 +205,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
+      // ── Coordonnees GPS (best-effort, non bloquant) ──────────────────────
+      final position = await _getPosition();
+
       // ── Tentative de connexion sur le backend ────────────────────────────
-      final user = await _repo.login(email, pin, role.name);
+      final user = await _repo.login(
+        email,
+        pin,
+        role.name,
+        lat: position?.lat,
+        lng: position?.lng,
+      );
       await _persist(user);
       state = AuthState(
         role: _roleFromBackend(user['role'] as String?),

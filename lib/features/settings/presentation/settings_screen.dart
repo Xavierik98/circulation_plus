@@ -8,6 +8,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../../../shared/widgets/pnc_badge.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -235,23 +236,22 @@ class SettingsScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              color: roleColor.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: roleColor.withValues(alpha: 0.3)),
-            ),
-            child: Icon(
-              switch (auth.role) {
-                UserRole.police => Icons.local_police_rounded,
-                UserRole.citizen => Icons.person_rounded,
-                UserRole.admin => Icons.admin_panel_settings_rounded,
-                UserRole.none => Icons.person_outline_rounded,
-              },
-              color: roleColor,
-              size: 26,
-            ),
+          // Avatar editable — meme logique que le profil citoyen
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              UserAvatar(
+                size: 56,
+                editable: true,
+                photoUrl: auth.photoUrl,
+                initials: auth.initials,
+                gradient: LinearGradient(
+                  colors: [roleColor, roleColor.withValues(alpha: 0.6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -259,7 +259,16 @@ class SettingsScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(auth.userName ?? 'Utilisateur', style: AppTextStyles.titleSmall),
-                Text(auth.userId ?? '', style: AppTextStyles.mono.copyWith(fontSize: 11, color: AppColors.textTertiary)),
+                if (auth.email != null && auth.email!.isNotEmpty)
+                  Text(
+                    auth.email!,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textTertiary,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -268,7 +277,18 @@ class SettingsScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: roleColor.withValues(alpha: 0.3)),
                   ),
-                  child: Text(roleLabel, style: AppTextStyles.caption.copyWith(color: roleColor)),
+                  child: Text(
+                    roleLabel,
+                    style: AppTextStyles.caption.copyWith(color: roleColor),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Appuyez sur la photo pour la modifier',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textDisabled,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),

@@ -20,11 +20,20 @@ class AuthRepository {
   Future<Map<String, dynamic>> login(
     String email,
     String pin,
-    String role,
-  ) async {
+    String role, {
+    double? lat,
+    double? lng,
+  }) async {
     final data = await _api.post(
       '/api/auth/login',
-      body: {'email': email, 'pin': pin, 'role': role},
+      body: {
+        'email': email,
+        'pin': pin,
+        'role': role,
+        // Coordonnees GPS optionnelles — tracabilite connexion agent
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+      },
     ) as Map<String, dynamic>;
     await _api.saveTokens(
       data['token'] as String,

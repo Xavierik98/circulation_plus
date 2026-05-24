@@ -112,7 +112,8 @@ describe('Payments', () => {
 
     const r = confirmed!.repartition!;
     const sum = r.partDeveloppeur + r.partAgent + r.partPolice + r.partTresor;
-    expect(sum).toBe(15000);
+    // montantTotal = montantBase (15000) + PART_DEVELOPPEUR (1000) = 16000
+    expect(sum).toBe(16000);
     expect(r.partDeveloppeur).toBe(1000);
   });
 
@@ -135,7 +136,8 @@ describe('Payments', () => {
     });
     const sum =
       r!.partDeveloppeur + r!.partAgent + r!.partPolice + r!.partTresor;
-    expect(sum).toBe(23457);
+    // montantTotal = montantBase (23457) + PART_DEVELOPPEUR (1000) = 24457
+    expect(sum).toBe(24457);
   });
 
   it('webhook dupliqué → 200 idempotent, pas de double répartition', async () => {

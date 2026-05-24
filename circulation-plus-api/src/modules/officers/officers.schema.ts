@@ -19,6 +19,47 @@ const PASSWORD_POLICY = z
   .regex(/[0-9]/, 'Doit contenir au moins un chiffre')
   .regex(/[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|`~]/, 'Doit contenir au moins un caractère spécial');
 
+// ── Enums PNC (miroir du schéma Prisma) ───────────────────────────────────────
+export const GRADES_PNC = [
+  'DIRECTEUR_GENERAL',
+  'DIRECTEUR_GENERAL_ADJOINT',
+  'DIRECTEUR_CENTRAL',
+  'DIRECTEUR_DEPARTEMENTAL',
+  'COMMISSAIRE_DIVISIONNAIRE',
+  'COMMISSAIRE_PRINCIPAL',
+  'COMMISSAIRE',
+  'INSPECTEUR_PRINCIPAL',
+  'INSPECTEUR',
+  'BRIGADIER_CHEF',
+  'BRIGADIER',
+  'GARDIEN_DE_LA_PAIX_1CL',
+  'GARDIEN_DE_LA_PAIX_2CL',
+] as const;
+
+export const NIVEAUX_HIERARCHIQUES = [
+  'DIRECTION_GENERALE',
+  'DIRECTION_DEPT',
+  'COMMISSARIAT_CENTRAL',
+  'COMMISSARIAT_ZONE',
+  'AGENT',
+] as const;
+
+export const DEPARTEMENTS = [
+  'BRAZZAVILLE',
+  'POINTE_NOIRE',
+  'BOUENZA',
+  'CUVETTE',
+  'CUVETTE_OUEST',
+  'KOUILOU',
+  'LEKOUMOU',
+  'LIKOUALA',
+  'NIARI',
+  'PLATEAUX',
+  'POOL',
+  'SANGHA',
+] as const;
+
+// ── Schémas ────────────────────────────────────────────────────────────────────
 export const officersQuerySchema = z.object({
   page:   z.coerce.number().int().positive().default(1),
   limit:  z.coerce.number().int().positive().max(100).default(20),
@@ -27,22 +68,32 @@ export const officersQuerySchema = z.object({
 export type OfficersQuery = z.infer<typeof officersQuerySchema>;
 
 export const createOfficerSchema = z.object({
-  email:       pncEmail,
-  pin:         PASSWORD_POLICY,
-  name:        z.string().min(2).max(80),
-  badgeNumber: z.string().min(1),
-  telephone:   z.string().min(8).max(20),
+  email:              pncEmail,
+  pin:                PASSWORD_POLICY,
+  name:               z.string().min(2).max(80),
+  badgeNumber:        z.string().min(1),
+  telephone:          z.string().min(8).max(20),
+  // Champs hiérarchiques — optionnels à la création
+  grade:              z.enum(GRADES_PNC).optional(),
+  departement:        z.enum(DEPARTEMENTS).optional(),
+  niveauHierarchique: z.enum(NIVEAUX_HIERARCHIQUES).optional(),
+  commissariatId:     z.string().uuid().optional(),
 });
 export type CreateOfficerBody = z.infer<typeof createOfficerSchema>;
 
 export const updateOfficerSchema = z
   .object({
-    email:       pncEmail.optional(),
-    pin:         PASSWORD_POLICY.optional(),
-    name:        z.string().min(2).max(80).optional(),
-    badgeNumber: z.string().min(1).optional(),
-    telephone:   z.string().min(8).max(20).optional(),
-    actif:       z.boolean().optional(),
+    email:              pncEmail.optional(),
+    pin:                PASSWORD_POLICY.optional(),
+    name:               z.string().min(2).max(80).optional(),
+    badgeNumber:        z.string().min(1).optional(),
+    telephone:          z.string().min(8).max(20).optional(),
+    actif:              z.boolean().optional(),
+    // Champs hiérarchiques modifiables par l'admin
+    grade:              z.enum(GRADES_PNC).optional(),
+    departement:        z.enum(DEPARTEMENTS).optional(),
+    niveauHierarchique: z.enum(NIVEAUX_HIERARCHIQUES).optional(),
+    commissariatId:     z.string().uuid().nullable().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, {
     message: 'Au moins un champ à modifier est requis',

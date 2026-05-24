@@ -50,7 +50,8 @@ describe('Fines', () => {
     const body = res.json();
     expect(body.success).toBe(true);
     expect(body.data.reference).toMatch(/^PV-\d{4}-\d{6}$/);
-    expect(body.data.montantTotal).toBe(15000);
+    // montantTotal = montantBase (15000) + PART_DEVELOPPEUR (1000)
+    expect(body.data.montantTotal).toBe(16000);
     const echeance = new Date(body.data.dateEcheance).getTime();
     const verb = new Date(body.data.verbaliseLe).getTime();
     expect(Math.round((echeance - verb) / (24 * 3600 * 1000))).toBe(30);

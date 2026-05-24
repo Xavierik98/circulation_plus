@@ -30,21 +30,26 @@ class _RegisterAgentScreenState extends ConsumerState<RegisterAgentScreen> {
   final _confirmCtrl = TextEditingController();
 
   CongoDepartement? _department;
-  String _rank = 'Agent';
+  // Grade PNC : clé = valeur enum backend, valeur = libellé affiché
+  static const _gradeMap = <String, String>{
+    'GARDIEN_DE_LA_PAIX_2CL':    'Gardien de la Paix 2ᵉ cl.',
+    'GARDIEN_DE_LA_PAIX_1CL':    'Gardien de la Paix 1ʳᵉ cl.',
+    'BRIGADIER':                  'Brigadier',
+    'BRIGADIER_CHEF':             'Brigadier-Chef',
+    'INSPECTEUR':                 'Inspecteur',
+    'INSPECTEUR_PRINCIPAL':       'Inspecteur Principal',
+    'COMMISSAIRE':                'Commissaire',
+    'COMMISSAIRE_PRINCIPAL':      'Commissaire Principal',
+    'COMMISSAIRE_DIVISIONNAIRE':  'Commissaire Divisionnaire',
+    'DIRECTEUR_DEPARTEMENTAL':    'Directeur Départemental',
+    'DIRECTEUR_CENTRAL':          'Directeur Central',
+    'DIRECTEUR_GENERAL_ADJOINT':  'Directeur Général Adjoint',
+    'DIRECTEUR_GENERAL':          'Directeur Général',
+  };
+  String _rank = 'GARDIEN_DE_LA_PAIX_2CL'; // enum value envoyé au backend
   bool _passVisible = false;
   bool _isLoading = false;
   String? _generatedPassword; // mot de passe auto-généré affiché à l'admin
-
-  static const _ranks = [
-    'Agent',
-    'Brigadier',
-    'Sergent',
-    'Lieutenant',
-    'Capitaine',
-    'Commandant',
-    'Lieutenant-Colonel',
-    'Colonel',
-  ];
 
   @override
   void dispose() {
@@ -295,10 +300,10 @@ class _RegisterAgentScreenState extends ConsumerState<RegisterAgentScreen> {
                                   prefixIcon: Icon(Icons.military_tech_rounded,
                                       color: AppColors.gold, size: 20),
                                 ),
-                                items: _ranks
-                                    .map((r) => DropdownMenuItem(
-                                        value: r,
-                                        child: Text(r,
+                                items: _gradeMap.entries
+                                    .map((e) => DropdownMenuItem(
+                                        value: e.key,
+                                        child: Text(e.value,
                                             style: AppTextStyles.bodySmall
                                                 .copyWith(
                                                     color: AppColors

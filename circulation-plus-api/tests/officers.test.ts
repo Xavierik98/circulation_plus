@@ -81,13 +81,14 @@ describe('Officers API', () => {
         url: '/api/officers',
         headers: authHeader(token),
         payload: {
-          name: 'Nouveau Agent',
-          email: 'nouveau.agent@pnc.cg',
-          telephone: '+242066000099',
-          badgeNumber: 'PNC-NEW-001',
-          rank: 'INSPECTEUR',
-          department: 'BRAZZAVILLE',
-          password: 'Test@1234!',
+          name:               'Nouveau Agent',
+          email:              'nouveau.agent@pnc.cg',
+          telephone:          '+242066000099',
+          badgeNumber:        'PNC-NEW-001',
+          pin:                'Test@1234!',
+          grade:              'INSPECTEUR',
+          departement:        'BRAZZAVILLE',
+          niveauHierarchique: 'AGENT',
         },
       });
 
@@ -95,6 +96,8 @@ describe('Officers API', () => {
       const body = res.json();
       expect(body.data.email).toBe('nouveau.agent@pnc.cg');
       expect(body.data.mustChangePassword).toBe(true);
+      expect(body.data.grade).toBe('INSPECTEUR');
+      expect(body.data.departement).toBe('BRAZZAVILLE');
     });
 
     it('email hors domaine @pnc.cg → 400 INVALID_OFFICER_DOMAIN', async () => {
@@ -105,13 +108,11 @@ describe('Officers API', () => {
         url: '/api/officers',
         headers: authHeader(token),
         payload: {
-          name: 'Agent Invalide',
-          email: 'agent@gmail.com',
-          telephone: '+242066000088',
+          name:        'Agent Invalide',
+          email:       'agent@gmail.com',
+          telephone:   '+242066000088',
           badgeNumber: 'PNC-BAD-001',
-          rank: 'INSPECTEUR',
-          department: 'BRAZZAVILLE',
-          password: 'Test@1234!',
+          pin:         'Test@1234!',
         },
       });
 
@@ -127,13 +128,11 @@ describe('Officers API', () => {
         url: '/api/officers',
         headers: authHeader(token),
         payload: {
-          name: 'Agent Doublon',
-          email: 'agent@pnc.cg',
-          telephone: '+242066000077',
+          name:        'Agent Doublon',
+          email:       'agent@pnc.cg',
+          telephone:   '+242066000077',
           badgeNumber: 'PNC-DUP-001',
-          rank: 'INSPECTEUR',
-          department: 'BRAZZAVILLE',
-          password: 'Test@1234!',
+          pin:         'Test@1234!',
         },
       });
 

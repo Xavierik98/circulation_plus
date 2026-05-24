@@ -120,7 +120,7 @@ class AuthRepository {
         'email': email,
         'telephone': telephone,
         'badgeNumber': badge,
-        'rank': rank,
+        'grade': rank,
         'departement': department,
         'pin': password,
       },

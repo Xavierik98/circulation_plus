@@ -148,11 +148,11 @@ export async function listOfficers(
         lastSeenAt: officer.lastSeenAt,
         totalFines,
         montantCollecte: collected._sum.montantTotal ?? 0,
-        // Champs hiérarchiques
-        grade: (officer as Record<string, unknown>)['grade'] as string | null ?? null,
-        niveauHierarchique: (officer as Record<string, unknown>)['niveauHierarchique'] as string ?? 'AGENT',
+        // Champs hiérarchiques (champs Prisma directs — pas de cast unsafe)
+        grade: officer.grade ?? null,
+        niveauHierarchique: officer.niveauHierarchique ?? 'AGENT',
         commissariatId: officer.commissariatId ?? null,
-        departement: (officer as Record<string, unknown>)['departement'] as string | null ?? null,
+        departement: officer.departement ?? null,
       };
     }),
   );
@@ -189,7 +189,11 @@ export async function createOfficer(body: CreateOfficerBody, actorId: string) {
       badgeNumber: body.badgeNumber,
       telephone: body.telephone,
       role: 'POLICE',
-      mustChangePassword: true, // Changement obligatoire au 1er login
+      mustChangePassword: true,                         // Changement obligatoire au 1er login
+      grade:              body.grade              ?? undefined,
+      departement:        body.departement        ?? undefined,
+      niveauHierarchique: body.niveauHierarchique ?? 'AGENT',
+      commissariatId:     body.commissariatId     ?? undefined,
     },
   });
 
@@ -213,13 +217,17 @@ export async function createOfficer(body: CreateOfficerBody, actorId: string) {
   }
 
   return {
-    id: officer.id,
-    email: officer.email,
-    name: officer.name,
-    badgeNumber: officer.badgeNumber,
-    telephone: officer.telephone,
-    actif: officer.actif,
+    id:                 officer.id,
+    email:              officer.email,
+    name:               officer.name,
+    badgeNumber:        officer.badgeNumber,
+    telephone:          officer.telephone,
+    actif:              officer.actif,
     mustChangePassword: officer.mustChangePassword,
+    grade:              officer.grade ?? null,
+    departement:        officer.departement ?? null,
+    niveauHierarchique: officer.niveauHierarchique,
+    commissariatId:     officer.commissariatId ?? null,
   };
 }
 
@@ -400,11 +408,19 @@ export async function updateOfficer(
     }
     data.email = body.email;
   }
-  if (body.name !== undefined)        data.name = body.name;
-  if (body.badgeNumber !== undefined) data.badgeNumber = body.badgeNumber;
-  if (body.telephone !== undefined)   data.telephone = body.telephone;
-  if (body.actif !== undefined)       data.actif = body.actif;
-  if (body.pin !== undefined)         data.pinHash = await bcrypt.hash(body.pin, PIN_ROUNDS);
+  if (body.name              !== undefined) data.name              = body.name;
+  if (body.badgeNumber       !== undefined) data.badgeNumber       = body.badgeNumber;
+  if (body.telephone         !== undefined) data.telephone         = body.telephone;
+  if (body.actif             !== undefined) data.actif             = body.actif;
+  if (body.pin               !== undefined) data.pinHash           = await bcrypt.hash(body.pin, PIN_ROUNDS);
+  if (body.grade             !== undefined) data.grade             = body.grade;
+  if (body.departement       !== undefined) data.departement       = body.departement;
+  if (body.niveauHierarchique !== undefined) data.niveauHierarchique = body.niveauHierarchique;
+  if (body.commissariatId !== undefined) {
+    data.commissariat = body.commissariatId
+      ? { connect: { id: body.commissariatId } }
+      : { disconnect: true };
+  }
 
   const updated = await prisma.user.update({ where: { id }, data });
 
@@ -419,12 +435,16 @@ export async function updateOfficer(
   });
 
   return {
-    id: updated.id,
-    email: updated.email,
-    name: updated.name,
-    badgeNumber: updated.badgeNumber,
-    telephone: updated.telephone,
-    actif: updated.actif,
+    id:                 updated.id,
+    email:              updated.email,
+    name:               updated.name,
+    badgeNumber:        updated.badgeNumber,
+    telephone:          updated.telephone,
+    actif:              updated.actif,
     mustChangePassword: updated.mustChangePassword,
+    grade:              updated.grade ?? null,
+    departement:        updated.departement ?? null,
+    niveauHierarchique: updated.niveauHierarchique,
+    commissariatId:     updated.commissariatId ?? null,
   };
 }

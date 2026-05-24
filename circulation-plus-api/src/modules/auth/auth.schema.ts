@@ -23,6 +23,10 @@ export const loginBodySchema = z.object({
   email: z.string().email(),
   pin:   z.string().min(1, 'Mot de passe requis'),
   role:  z.enum(['police', 'citizen', 'admin']),
+  // Coordonnees GPS optionnelles envoyees par le client au moment du login.
+  // Stockees dans AuditLog.details pour la traçabilite des connexions agents.
+  lat:   z.number().min(-90).max(90).optional(),
+  lng:   z.number().min(-180).max(180).optional(),
 });
 export type LoginBody = z.infer<typeof loginBodySchema>;
 

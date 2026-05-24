@@ -298,6 +298,80 @@ export async function importOfficersFromCsv(
   return { created: created.length, skipped, errors, credentials: created };
 }
 
+// ── Historique connexions/deconnexions d'un agent ────────────────────────
+export async function getOfficerActivity(
+  officerId: string,
+  page: number,
+  limit: number,
+  admin: AuthUser,
+): Promise<{
+  items: {
+    action: string;
+    createdAt: Date;
+    ip: string | null;
+    userAgent: string | null;
+    lat: number | null;
+    lng: number | null;
+  }[];
+  total: number;
+}> {
+  // Verifier que l'agent existe et est sous la juridiction de l'admin.
+  const officer = await prisma.user.findUnique({ where: { id: officerId } });
+  if (!officer || officer.role !== 'POLICE') {
+    throw AppError.notFound('Agent introuvable', 'OFFICER_NOT_FOUND');
+  }
+
+  // Controle hierarchique : l'admin ne peut consulter que les agents dans son perimetre.
+  const hierarchyFilter = await buildHierarchyFilter(admin);
+  if (hierarchyFilter.commissariatId) {
+    // Si un filtre commissariat est applique, verifier que l'agent en fait partie.
+    const allowed = hierarchyFilter.commissariatId;
+    const inScope =
+      typeof allowed === 'string'
+        ? officer.commissariatId === allowed
+        : typeof allowed === 'object' && 'in' in allowed
+          ? (allowed.in as string[]).includes(officer.commissariatId ?? '')
+          : true;
+    if (!inScope) {
+      throw AppError.forbidden("Cet agent n'est pas dans votre perimetre", 'FORBIDDEN');
+    }
+  } else if (hierarchyFilter.departement) {
+    if (officer.departement !== hierarchyFilter.departement) {
+      throw AppError.forbidden("Cet agent n'est pas dans votre departement", 'FORBIDDEN');
+    }
+  }
+
+  const where = {
+    userId: officerId,
+    action: { in: ['LOGIN', 'LOGOUT'] as string[] },
+  };
+
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: { action: true, createdAt: true, ip: true, userAgent: true, details: true },
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+
+  const items = logs.map((log) => {
+    const d = (log.details as Record<string, unknown> | null) ?? {};
+    return {
+      action: log.action,
+      createdAt: log.createdAt,
+      ip: log.ip,
+      userAgent: log.userAgent ?? null,
+      lat: typeof d['lat'] === 'number' ? d['lat'] : null,
+      lng: typeof d['lng'] === 'number' ? d['lng'] : null,
+    };
+  });
+
+  return { items, total };
+}
+
 // ── Modification d'un agent ───────────────────────────────────────────────
 export async function updateOfficer(
   id: string,

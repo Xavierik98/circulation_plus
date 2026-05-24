@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ok, paginated } from '../../shared/utils/response';
 import { authenticate } from '../../shared/middleware/authenticate';
 import { authorize } from '../../shared/middleware/authorize';
+import { z } from 'zod';
 import {
   officersQuerySchema,
   createOfficerSchema,
@@ -10,7 +11,7 @@ import {
   officerIdParamsSchema,
   importCsvSchema,
 } from './officers.schema';
-import { listOfficers, createOfficer, updateOfficer, importOfficersFromCsv } from './officers.service';
+import { listOfficers, createOfficer, updateOfficer, importOfficersFromCsv, getOfficerActivity } from './officers.service';
 
 // Module Officers — réservé au rôle ADMIN.
 export async function officersRoutes(app: FastifyInstance): Promise<void> {
@@ -77,6 +78,32 @@ export async function officersRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) =>
       ok(await importOfficersFromCsv(request.body.csvContent, request.user!.id)),
+  );
+
+  // GET /api/officers/:id/activity — historique connexions/deconnexions d'un agent.
+  r.get(
+    '/:id/activity',
+    {
+      preHandler: [authenticate, authorize('ADMIN')],
+      schema: {
+        tags: ['Agents'],
+        summary: "Historique connexions/deconnexions d'un agent",
+        description:
+          'Roles autorises : ADMIN. Retourne les evenements LOGIN/LOGOUT de l\'agent '
+          + 'avec heure, IP, User-Agent et coordonnees GPS si disponibles.',
+        security: [{ bearerAuth: [] }],
+        params: officerIdParamsSchema,
+        querystring: z.object({
+          page:  z.coerce.number().int().positive().default(1),
+          limit: z.coerce.number().int().positive().max(100).default(50),
+        }),
+      },
+    },
+    async (request) => {
+      const { id } = request.params;
+      const { page, limit } = request.query;
+      return ok(await getOfficerActivity(id, page, limit, request.user!));
+    },
   );
 
   // PATCH /api/officers/:id

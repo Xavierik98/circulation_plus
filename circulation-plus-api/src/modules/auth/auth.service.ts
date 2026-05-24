@@ -127,6 +127,8 @@ export async function login(
   role: 'police' | 'citizen' | 'admin',
   ip: string | null,
   userAgent?: string | null,
+  lat?: number | null,
+  lng?: number | null,
 ): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
   // 0. Domaine @pnc.cg obligatoire pour les agents.
   if (role === 'police' && !email.toLowerCase().endsWith(PNC_DOMAIN)) {
@@ -183,12 +185,24 @@ export async function login(
   const token = signAccessToken(user);
   const refreshToken = await issueRefreshToken(user.id);
 
+  // Mise à jour GPS pour les agents (lastLat/Lng/SeenAt) si coordonnées fournies.
+  if (lat != null && lng != null && user.role === 'POLICE') {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLat: lat, lastLng: lng, lastSeenAt: new Date() },
+    });
+  }
+
   await audit(prisma, {
     userId: user.id,
     action: 'LOGIN',
     ip,
     userAgent: userAgent ?? null,
-    details: { role: user.role, grade: (user as Record<string, unknown>)['grade'] ?? null },
+    details: {
+      role: user.role,
+      grade: (user as Record<string, unknown>)['grade'] ?? null,
+      ...(lat != null && lng != null ? { lat, lng } : {}),
+    },
   });
 
   return { token, refreshToken, user: publicUser(user) };

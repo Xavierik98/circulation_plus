@@ -258,9 +258,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request) => {
-      const { email, pin, role } = request.body;
+      const { email, pin, role, lat, lng } = request.body;
       const ua = request.headers['user-agent'] ?? null;
-      const result = await login(email, pin, role, request.ip, ua);
+      const result = await login(email, pin, role, request.ip, ua, lat, lng);
       return ok(result);
     },
   );

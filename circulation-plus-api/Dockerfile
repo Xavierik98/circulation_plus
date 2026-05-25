@@ -21,5 +21,5 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY --from=build /app/dist ./dist
 
-# Migration auto au démarrage puis lancement du serveur
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/server.js"]
+# Les migrations sont appliquées manuellement — on démarre directement
+CMD ["node", "dist/src/server.js"]

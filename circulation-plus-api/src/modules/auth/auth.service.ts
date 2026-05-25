@@ -296,7 +296,7 @@ export async function register(
     );
   }
 
-  const pinHash = await bcrypt.hash(pin, 12);
+  const pinHash = await bcrypt.hash(pin, 10);
 
   // En développement : email auto-vérifié → connexion immédiate sans lien.
   // En production : emailVerified=false → le citoyen doit cliquer sur le lien (24 h).

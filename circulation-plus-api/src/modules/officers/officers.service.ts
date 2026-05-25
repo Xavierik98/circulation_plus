@@ -9,7 +9,7 @@ import { sendCredentialsEmail } from '../../config/email';
 import type { CreateOfficerBody, UpdateOfficerBody } from './officers.schema';
 import type { AuthUser } from '../../types/fastify';
 
-const PIN_ROUNDS = 12;
+const PIN_ROUNDS = 10; // 10 rounds OWASP-compliant, faster on Railway
 const PNC_DOMAIN = '@pnc.cg';
 
 export interface OfficerWithStats {

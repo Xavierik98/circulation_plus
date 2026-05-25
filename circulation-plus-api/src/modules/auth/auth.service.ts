@@ -11,8 +11,8 @@ import { sendVerificationEmail, sendPasswordResetEmail } from '../../config/emai
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 jours
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_TTL_SECONDS = 30 * 60; // 30 minutes
+const MAX_FAILED_ATTEMPTS = 3;
+const LOCK_TTL_SECONDS = 15 * 60; // 15 minutes
 
 const ROLE_MAP: Record<'police' | 'citizen' | 'admin', Role> = {
   police: 'POLICE',
@@ -141,7 +141,7 @@ export async function login(
   // 1. Vérrou de compte (sans toucher la base).
   if (await redis.exists(lockKey(email))) {
     throw AppError.tooManyRequests(
-      'Compte temporairement bloqué (trop de tentatives). Réessayez dans 30 minutes.',
+      'Compte temporairement bloqué (trop de tentatives). Réessayez dans 15 minutes.',
       'ACCOUNT_LOCKED',
     );
   }
@@ -164,7 +164,7 @@ export async function login(
       await redis.set(lockKey(email), '1', 'EX', LOCK_TTL_SECONDS);
       await redis.del(failKey(email));
       throw AppError.tooManyRequests(
-        'Compte bloqué 30 minutes après 5 tentatives échouées.',
+        'Compte bloqué 15 minutes après 3 tentatives échouées.',
         'ACCOUNT_LOCKED',
       );
     }

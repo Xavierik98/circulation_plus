@@ -12,7 +12,7 @@ class AppConstants {
   // Backend API
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'https://circulationplus-production.up.railway.app',
   );
 
   // Shared Preferences Keys

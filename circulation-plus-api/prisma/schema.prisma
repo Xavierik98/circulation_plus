@@ -7,53 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ── Enums applicatifs (invariants) ────────────────────────────────────────────
+
 enum Role {
   POLICE
   CITOYEN
   ADMIN
 }
 
-/// Grades de la Police Nationale du Congo (du plus élevé au plus bas).
-/// Source : organigramme officiel PNC / Loi n°14-2004 portant statut de la PNC.
-enum GradePNC {
-  DIRECTEUR_GENERAL            // DG — échelon national (DGPN)
-  DIRECTEUR_GENERAL_ADJOINT    // DGA — DGPN adjoint
-  DIRECTEUR_CENTRAL            // Directeur d'une direction centrale (DCSP, etc.)
-  DIRECTEUR_DEPARTEMENTAL      // Chef d'une Direction Départementale de Sécurité Publique
-  COMMISSAIRE_DIVISIONNAIRE    // Responsable d'un commissariat central
-  COMMISSAIRE_PRINCIPAL        // Adjoint commissariat central ou chef commissariat zone
-  COMMISSAIRE                  // Chef de commissariat de quartier / arrondissement
-  INSPECTEUR_PRINCIPAL         // Officier de police judiciaire senior
-  INSPECTEUR                   // Officier de police judiciaire
-  BRIGADIER_CHEF               // Sous-officier senior
-  BRIGADIER                    // Sous-officier
-  GARDIEN_DE_LA_PAIX_1CL       // Agent de base 1ère classe
-  GARDIEN_DE_LA_PAIX_2CL       // Agent de base 2ème classe (entrée)
-}
-
-/// Niveau hiérarchique fonctionnel (contrôle l'accès aux données dans le système).
+/// Niveau hiérarchique fonctionnel : détermine la portée des données accessibles.
 enum NiveauHierarchique {
   DIRECTION_GENERALE   // Voit tout (national)
+  DIRECTION_NATIONALE  // Voit son domaine national (DSP, DPJ…)
   DIRECTION_DEPT       // Voit son département
-  COMMISSARIAT_CENTRAL // Voit les commissariats sous sa juridiction
+  COMMISSARIAT_CENTRAL // Voit les unités sous sa juridiction
   COMMISSARIAT_ZONE    // Voit son commissariat uniquement
   AGENT                // Voit ses propres données seulement
-}
-
-/// 12 départements de la République du Congo.
-enum Departement {
-  BRAZZAVILLE
-  POINTE_NOIRE
-  BOUENZA
-  CUVETTE
-  CUVETTE_OUEST
-  KOUILOU
-  LEKOUMOU
-  LIKOUALA
-  NIARI
-  PLATEAUX
-  POOL
-  SANGHA
 }
 
 enum FineStatus {
@@ -78,77 +47,238 @@ enum ConvocationStatus {
   DEFAULTER
 }
 
-/// Commissariat (de quartier, central ou direction) — unité organisationnelle PNC.
-model Commissariat {
-  id          String              @id @default(uuid())
-  nom         String
-  code        String              @unique // Ex: BZV-MOUNGALI-01
-  departement Departement
-  /// Adresse physique du commissariat.
-  adresse     String?
-  /// Commissariat parent (null = commissariat central ou direction).
-  parentId    String?
-  parent      Commissariat?       @relation("CommissariatHierarchy", fields: [parentId], references: [id])
-  enfants     Commissariat[]      @relation("CommissariatHierarchy")
-  /// GPS du commissariat (pour la carte).
-  lat         Float?
-  lng         Float?
-  actif       Boolean             @default(true)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-
-  agents      User[]
-
-  @@index([departement])
-  @@index([parentId])
+enum PaymentMode {
+  MOBILE_MONEY
+  TRESOR_PUBLIC
 }
 
-model User {
+enum SanctionType {
+  AVERTISSEMENT
+  BLAME
+  SUSPENSION_TEMPORAIRE
+  REVOCATION
+}
+
+// ── Organisation PNC Congo ─────────────────────────────────────────────────────
+
+/// Direction Générale de la Police Nationale (1 — DGPN).
+model DirectionGenerale {
+  id        String   @id @default(uuid())
+  nom       String
+  code      String   @unique // "DGPN"
+  adresse   String?
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  directionsNationales DirectionNationale[]
+}
+
+/// 7 Directions Nationales spécialisées (DSP, DPJ, DPAF, DCRP, DCI, DST, DRSP).
+model DirectionNationale {
+  id                  String            @id @default(uuid())
+  nom                 String
+  sigle               String            @unique // DSP, DPJ, DPAF…
+  description         String?
+  directionGeneraleId String
+  directionGenerale   DirectionGenerale @relation(fields: [directionGeneraleId], references: [id])
+  actif               Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  agents User[]
+
+  @@index([directionGeneraleId])
+}
+
+/// 12 départements géographiques de la République du Congo.
+model Departement {
+  id        String   @id @default(uuid())
+  nom       String
+  code      String   @unique // BRAZZAVILLE, POINTE_NOIRE, etc.
+  chefLieu  String?
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  directionDepartementale DirectionDepartementale?
+  commissariats           Commissariat[]
+  agents                  User[]
+
+  @@index([code])
+}
+
+/// Direction Départementale de Sécurité Publique — une par département.
+model DirectionDepartementale {
+  id            String      @id @default(uuid())
+  nom           String
+  code          String      @unique // DD-BZV, DD-PNR, etc.
+  adresse       String?
+  lat           Float?
+  lng           Float?
+  departementId String      @unique
+  departement   Departement @relation(fields: [departementId], references: [id])
+  actif         Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  commissariats Commissariat[]
+  agents        User[]
+
+  @@index([departementId])
+}
+
+/// 52 commissariats de la République du Congo.
+model Commissariat {
+  id                        String                   @id @default(uuid())
+  nom                       String
+  code                      String                   @unique
+  adresse                   String?
+  lat                       Float?
+  lng                       Float?
+  departementId             String
+  departement               Departement              @relation(fields: [departementId], references: [id])
+  directionDepartementaleId String?
+  directionDepartementale   DirectionDepartementale? @relation(fields: [directionDepartementaleId], references: [id])
+  actif                     Boolean                  @default(true)
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  unites Unite[]
+  agents User[]
+
+  @@index([departementId])
+  @@index([directionDepartementaleId])
+}
+
+/// 96 unités opérationnelles au sein des commissariats (BSP, BPJ, BCR, BIR, BMO, BAF…).
+model Unite {
+  id             String       @id @default(uuid())
+  nom            String
+  sigle          String       // BSP, BPJ, BCR, BIR, BMO, BAF
+  code           String       @unique
+  commissariatId String
+  commissariat   Commissariat @relation(fields: [commissariatId], references: [id])
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  agents User[]
+
+  @@index([commissariatId])
+}
+
+/// 12 grades officiels de la Police Nationale Congolaise.
+model Grade {
+  id        String  @id @default(uuid())
+  nom       String
+  code      String  @unique // GARDIEN_DE_LA_PAIX_2CL … DIRECTEUR_GENERAL
+  sigle     String?
+  niveau    Int     // 1 (entrée) → 12 (DG) — sert au tri
+  categorie String  // Gardien · Sous-officier · Officier · Off. supérieur · Direction
+  actif     Boolean @default(true)
+
+  agents User[]
+
+  @@index([niveau])
+}
+
+// ── RBAC ──────────────────────────────────────────────────────────────────────
+
+/// 8 rôles applicatifs (SUPERADMIN → LECTEUR).
+model AppRole {
   id          String   @id @default(uuid())
-  email       String   @unique
+  nom         String
+  code        String   @unique
+  description String?
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+  agents          User[]
+}
+
+/// 15 permissions RBAC.
+model Permission {
+  id          String @id @default(uuid())
+  nom         String
+  code        String @unique // officers:create, fines:read, etc.
+  description String?
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  appRoleId    String
+  appRole      AppRole    @relation(fields: [appRoleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([appRoleId, permissionId])
+  @@index([appRoleId])
+}
+
+// ── Utilisateur ───────────────────────────────────────────────────────────────
+
+model User {
+  id          String  @id @default(uuid())
+  email       String  @unique
   pinHash     String
   role        Role
   name        String
-  badgeNumber String?  @unique // Agents uniquement
+  badgeNumber String? @unique
   telephone   String?
-  actif                Boolean  @default(true)
-  mustChangePassword   Boolean  @default(false) // Force le changement au 1er login
-  emailVerified        Boolean  @default(true)  // false pour les nouveaux citoyens jusqu'à validation
-  emailVerificationToken String? @unique        // Jeton de validation email (CITOYEN uniquement)
-  // Token Firebase Cloud Messaging du terminal de l'agent (ajout : le spec exige
-  // un push FCM mais ne stocke aucun token ; la Notification reste le canal durable).
-  fcmToken    String?
-  /// URL de la photo de profil (stockée sur R2 ou stub local).
-  photoUrl    String?
-  /// Département d'affectation de l'agent (POLICE uniquement).
-  departement Departement?
-  /// Grade officiel PNC de l'agent (POLICE uniquement).
-  grade       GradePNC?
-  /// Niveau hiérarchique fonctionnel : détermine la portée des données visibles.
-  niveauHierarchique NiveauHierarchique @default(AGENT)
-  /// Commissariat d'affectation (POLICE uniquement — null = direction nationale).
-  commissariatId String?
-  commissariat   Commissariat? @relation(fields: [commissariatId], references: [id])
-  /// Statut de service de l'agent (En service / Hors service).
-  onDuty      Boolean   @default(false)
-  lastLat     Float?
-  lastLng     Float?
-  lastSeenAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
-  finesAsOfficer   Fine[]      @relation("OfficerFines")
-  finesAsCitizen   Fine[]      @relation("CitizenFines")
-  notifications    Notification[]
-  auditLogs        AuditLog[]
-  sanctionsRecues  Sanction[]  @relation("OfficerSanctions")
-  sanctionsEmises  Sanction[]  @relation("AdminSanctions")
+  actif                  Boolean  @default(true)
+  mustChangePassword     Boolean  @default(false)
+  emailVerified          Boolean  @default(true)
+  emailVerificationToken String?  @unique
+  fcmToken               String?
+  photoUrl               String?
+
+  /// Niveau hiérarchique fonctionnel : contrôle la portée des données visibles.
+  niveauHierarchique NiveauHierarchique @default(AGENT)
+
+  // Affectation organisationnelle
+  gradeId                   String?
+  grade                     Grade?                   @relation(fields: [gradeId], references: [id])
+  departementId             String?
+  departement               Departement?             @relation(fields: [departementId], references: [id])
+  directionNationaleId      String?
+  directionNationale        DirectionNationale?      @relation(fields: [directionNationaleId], references: [id])
+  directionDepartementaleId String?
+  directionDepartementale   DirectionDepartementale? @relation(fields: [directionDepartementaleId], references: [id])
+  commissariatId            String?
+  commissariat              Commissariat?            @relation(fields: [commissariatId], references: [id])
+  uniteId                   String?
+  unite                     Unite?                   @relation(fields: [uniteId], references: [id])
+  appRoleId                 String?
+  appRole                   AppRole?                 @relation(fields: [appRoleId], references: [id])
+
+  onDuty     Boolean   @default(false)
+  lastLat    Float?
+  lastLng    Float?
+  lastSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  finesAsOfficer  Fine[]         @relation("OfficerFines")
+  finesAsCitizen  Fine[]         @relation("CitizenFines")
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  sanctionsRecues Sanction[]     @relation("OfficerSanctions")
+  sanctionsEmises Sanction[]     @relation("AdminSanctions")
 
   @@index([email])
   @@index([badgeNumber])
   @@index([commissariatId])
   @@index([niveauHierarchique])
+  @@index([departementId])
 }
+
+// ── Métier (infractions, amendes, paiements) ──────────────────────────────────
 
 model InfractionType {
   id                     String   @id @default(uuid())
@@ -209,36 +339,30 @@ model Fine {
   infractionTypeId String
   infractionType   InfractionType @relation(fields: [infractionTypeId], references: [id])
 
-  montantAmende      Int // XAF — montant officiel de l'infraction
-  montantDeveloppeur Int @default(1000) // 1 000 XAF — frais plateforme Circulation+
+  montantAmende      Int
+  montantDeveloppeur Int @default(1000)
   montantMajoration  Int @default(0)
-  montantTotal       Int // = montantAmende + montantDeveloppeur + montantMajoration
+  montantTotal       Int
 
   latitude      Float?
   longitude     Float?
   adresseApprox String?
-  /// Département où l'infraction a été constatée.
-  departementInfraction Departement?
-  /// Lieu précis (rue, carrefour, axe) renseigné par l'agent.
-  lieuPrecis    String?
+  /// Code du département où l'infraction a été constatée (ex : "BRAZZAVILLE").
+  departementCode String?
+  lieuPrecis      String?
 
-  // Horodatage : verbaliseLe = valeur client validée ; createdAt = vérité serveur
-  verbaliseLe DateTime
+  verbaliseLe  DateTime
   dateEcheance DateTime
 
   signatureAgent        String?
   signatureContrevenant String?
-  refusSignature        Boolean  @default(false)
-  /// Documents saisis en cas de refus de signature (JSON array de strings).
+  refusSignature        Boolean @default(false)
   documentsSeizes       Json?
-  /// Convocation déclenchée automatiquement en cas de refus de signature.
-  convocationRequise    Boolean  @default(false)
+  convocationRequise    Boolean @default(false)
 
   status FineStatus @default(PENDING)
+  pdfUrl String?
 
-  pdfUrl String? // URL Cloudflare R2
-
-  // Sync offline
   deviceId  String?
   synchedAt DateTime?
 
@@ -254,12 +378,6 @@ model Fine {
   @@index([verbaliseLe])
 }
 
-/// Mode de paiement d'une amende.
-enum PaymentMode {
-  MOBILE_MONEY   // MTN / Airtel Money
-  TRESOR_PUBLIC  // Paiement physique au Trésor public avec quittance
-}
-
 model Payment {
   id     String @id @default(uuid())
   fineId String @unique
@@ -268,22 +386,16 @@ model Payment {
   montantTotal Int
   mode         PaymentMode @default(MOBILE_MONEY)
 
-  // Mobile Money (optionnel si mode = TRESOR_PUBLIC)
-  operateur    String?  // "MTN" | "AIRTEL"
-  telephone    String?
+  operateur     String?
+  telephone     String?
   transactionId String? @unique
 
-  // Trésor public (optionnel si mode = MOBILE_MONEY)
-  /// Numéro de quittance délivré par le Trésor public.
   quittanceNumero String?
-  /// Date de paiement au guichet du Trésor.
   quittanceDate   DateTime?
-  /// Agent du Trésor ayant encaissé (optionnel).
   agentTresor     String?
 
-  status        PaymentStatus @default(PENDING)
-
-  initiatedAt DateTime  @default(now())
+  status      PaymentStatus @default(PENDING)
+  initiatedAt DateTime      @default(now())
   confirmedAt DateTime?
 
   repartition Repartition?
@@ -297,7 +409,7 @@ model Repartition {
   paymentId String  @unique
   payment   Payment @relation(fields: [paymentId], references: [id])
 
-  partDeveloppeur Int // 1 000 XAF fixe
+  partDeveloppeur Int
   partAgent       Int
   partPolice      Int
   partTresor      Int
@@ -337,9 +449,9 @@ model Notification {
 
   title String
   body  String
-  type  String // "fine_created" | "payment_confirmed" | "convocation" | ...
+  type  String
   read  Boolean @default(false)
-  data  Json? // Payload additionnel (fineId, etc.)
+  data  Json?
 
   createdAt DateTime @default(now())
 
@@ -356,7 +468,7 @@ model AuditLog {
   action    String
   details   Json?
   ip        String?
-  userAgent String? // User-Agent HTTP — modèle d'appareil, OS, version app
+  userAgent String?
 
   createdAt DateTime @default(now())
 
@@ -375,18 +487,9 @@ model LicenseVerification {
   @@index([numeroPermis])
 }
 
-// Compteur de séquence annuel pour générer "reference" (PV-YYYY-NNNNNN)
-// de façon sûre sous concurrence (verrou de ligne en transaction).
 model FineCounter {
   year    Int @id
   lastSeq Int @default(0)
-}
-
-enum SanctionType {
-  AVERTISSEMENT
-  BLAME
-  SUSPENSION_TEMPORAIRE
-  REVOCATION
 }
 
 model Sanction {

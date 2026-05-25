@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import type { Role, NiveauHierarchique, Departement } from '@prisma/client';
+import type { Role, NiveauHierarchique } from '@prisma/client';
 import { buildApp } from '../src/app';
 import { prisma } from '../src/config/database';
 
@@ -17,7 +17,7 @@ export async function createUser(params: {
   badgeNumber?: string;
   telephone?: string;
   niveauHierarchique?: NiveauHierarchique;
-  departement?: Departement;
+  departementId?: string;
   commissariatId?: string;
 }) {
   // Use cost 4 in tests for speed (still valid bcrypt, just faster).
@@ -26,15 +26,15 @@ export async function createUser(params: {
     where: { email: params.email },
     update: {},
     create: {
-      email: params.email,
+      email:              params.email,
       pinHash,
-      role: params.role,
-      name: params.name ?? params.email,
-      badgeNumber: params.badgeNumber ?? null,
-      telephone: params.telephone ?? null,
+      role:               params.role,
+      name:               params.name ?? params.email,
+      badgeNumber:        params.badgeNumber  ?? null,
+      telephone:          params.telephone    ?? null,
       niveauHierarchique: params.niveauHierarchique ?? 'AGENT',
-      departement: params.departement ?? null,
-      commissariatId: params.commissariatId ?? null,
+      departementId:      params.departementId  ?? null,
+      commissariatId:     params.commissariatId ?? null,
     },
   });
 }
@@ -44,11 +44,13 @@ export async function createInfractionType(params?: {
   montantBase?: number;
   convocationObligatoire?: boolean;
 }) {
+  // Use a random suffix to avoid unique constraint conflicts across parallel tests
+  const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
   return prisma.infractionType.create({
     data: {
-      code: params?.code ?? 'TEST-1',
-      libelle: 'Infraction de test',
-      montantBase: params?.montantBase ?? 15000,
+      code:                  params?.code ?? `TEST-${suffix}`,
+      libelle:               'Infraction de test',
+      montantBase:           params?.montantBase ?? 15000,
       convocationObligatoire: params?.convocationObligatoire ?? false,
     },
   });

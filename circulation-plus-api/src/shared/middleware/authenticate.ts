@@ -35,7 +35,9 @@ export async function authenticate(request: FastifyRequest): Promise<void> {
     throw AppError.unauthorized('Token invalide ou expiré', 'INVALID_TOKEN');
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+  });
   if (!user || !user.actif) {
     throw AppError.unauthorized('Compte introuvable ou désactivé', 'ACCOUNT_INACTIVE');
   }
@@ -48,7 +50,9 @@ export async function authenticate(request: FastifyRequest): Promise<void> {
     mustChangePassword: user.mustChangePassword,
     niveauHierarchique: user.niveauHierarchique,
     commissariatId: user.commissariatId,
-    departement: user.departement,
+    departementId: user.departementId,
+    directionNationaleId: user.directionNationaleId,
+    directionDepartementaleId: user.directionDepartementaleId,
   };
 
   // Sécurité : forcer le changement de mot de passe avant tout accès.

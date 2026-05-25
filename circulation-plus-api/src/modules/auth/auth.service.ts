@@ -98,10 +98,10 @@ function publicUser(user: User): {
   actif: boolean;
   mustChangePassword: boolean;
   emailVerified: boolean;
-  grade: string | null;
+  gradeId: string | null;
+  departementId: string | null;
   niveauHierarchique: string;
   commissariatId: string | null;
-  departement: string | null;
 } {
   return {
     id: user.id,
@@ -114,10 +114,10 @@ function publicUser(user: User): {
     actif: user.actif,
     mustChangePassword: user.mustChangePassword,
     emailVerified: user.emailVerified,
-    grade: (user as Record<string, unknown>)['grade'] as string | null ?? null,
-    niveauHierarchique: (user as Record<string, unknown>)['niveauHierarchique'] as string ?? 'AGENT',
-    commissariatId: (user as Record<string, unknown>)['commissariatId'] as string | null ?? null,
-    departement: (user as Record<string, unknown>)['departement'] as string | null ?? null,
+    gradeId:            user.gradeId      ?? null,
+    departementId:      user.departementId ?? null,
+    niveauHierarchique: user.niveauHierarchique ?? 'AGENT',
+    commissariatId:     user.commissariatId ?? null,
   };
 }
 

@@ -1,7 +1,11 @@
 import { defineConfig } from 'vitest/config';
+import 'dotenv/config'; // charge .env avant d'évaluer les URLs
 
+// Tests use TEST_DATABASE_URL if set; otherwise falls back to DATABASE_URL (Neon).
+// This allows sharing the same Neon DB for tests — setup.ts truncates tables before each test.
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
+  process.env.DATABASE_URL ??
   'postgresql://postgres:password@localhost:5432/circulation_test';
 
 export default defineConfig({
@@ -16,7 +20,7 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: TEST_DATABASE_URL,
-      REDIS_URL: process.env.TEST_REDIS_URL ?? 'redis://localhost:6379',
+      REDIS_URL: process.env.TEST_REDIS_URL ?? process.env.REDIS_URL ?? 'redis://localhost:6379',
       BASE_URL: 'http://localhost:3000',
       CORS_ORIGINS: '*',
       JWT_SECRET: 'test_jwt_secret_at_least_32_characters_long',

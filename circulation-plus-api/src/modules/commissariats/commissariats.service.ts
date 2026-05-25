@@ -3,29 +3,38 @@ import { AppError } from '../../shared/errors/AppError';
 import { audit } from '../../shared/middleware/audit';
 import type { CreateCommissariatBody, UpdateCommissariatBody } from './commissariats.schema';
 
-// ── Liste paginee ──────────────────────────────────────────────────────────────
+// ── Liste paginée ──────────────────────────────────────────────────────────────
 export async function listCommissariats(params: {
-  departement?: string;
-  parentId?: string;
+  departement?: string;    // code string (ex: BRAZZAVILLE)
   actif?: boolean;
   page: number;
   limit: number;
 }) {
+  // Résoudre departement code → departementId
+  let departementId: string | undefined;
+  if (params.departement) {
+    const dept = await prisma.departement.findUnique({ where: { code: params.departement } });
+    if (!dept) {
+      return { items: [], total: 0 };
+    }
+    departementId = dept.id;
+  }
+
   const where = {
-    ...(params.departement ? { departement: params.departement as never } : {}),
-    ...(params.parentId !== undefined ? { parentId: params.parentId } : {}),
-    ...(params.actif !== undefined ? { actif: params.actif } : {}),
+    ...(departementId !== undefined ? { departementId } : {}),
+    ...(params.actif  !== undefined ? { actif: params.actif } : {}),
   };
 
   const [items, total] = await Promise.all([
     prisma.commissariat.findMany({
       where,
-      orderBy: [{ departement: 'asc' }, { nom: 'asc' }],
+      orderBy: [{ departementId: 'asc' }, { nom: 'asc' }],
       skip: (params.page - 1) * params.limit,
       take: params.limit,
       include: {
-        parent: { select: { id: true, nom: true, code: true } },
-        _count: { select: { enfants: true, agents: true } },
+        departement:            { select: { id: true, code: true, nom: true } },
+        directionDepartementale:{ select: { id: true, code: true, nom: true } },
+        _count: { select: { unites: true, agents: true } },
       },
     }),
     prisma.commissariat.count({ where }),
@@ -33,33 +42,36 @@ export async function listCommissariats(params: {
 
   return {
     items: items.map((c) => ({
-      id: c.id,
-      nom: c.nom,
-      code: c.code,
-      departement: c.departement,
-      adresse: c.adresse,
-      parentId: c.parentId,
-      parentNom: c.parent?.nom ?? null,
-      lat: c.lat,
-      lng: c.lng,
-      actif: c.actif,
-      createdAt: c.createdAt,
-      nbEnfants: c._count.enfants,
-      nbAgents: c._count.agents,
+      id:                       c.id,
+      nom:                      c.nom,
+      code:                     c.code,
+      departementCode:          c.departement?.code  ?? null,
+      departementNom:           c.departement?.nom   ?? null,
+      departementId:            c.departementId,
+      directionDepartementaleId:c.directionDepartementaleId,
+      directionDepartementaleNom: c.directionDepartementale?.nom ?? null,
+      adresse:                  c.adresse,
+      lat:                      c.lat,
+      lng:                      c.lng,
+      actif:                    c.actif,
+      createdAt:                c.createdAt,
+      nbUnites:                 c._count.unites,
+      nbAgents:                 c._count.agents,
     })),
     total,
   };
 }
 
-// ── Detail ─────────────────────────────────────────────────────────────────────
+// ── Détail ─────────────────────────────────────────────────────────────────────
 export async function getCommissariat(id: string) {
   const c = await prisma.commissariat.findUnique({
     where: { id },
     include: {
-      parent: { select: { id: true, nom: true, code: true } },
-      enfants: {
+      departement:             { select: { id: true, code: true, nom: true } },
+      directionDepartementale: { select: { id: true, code: true, nom: true } },
+      unites: {
         where: { actif: true },
-        select: { id: true, nom: true, code: true, departement: true },
+        select: { id: true, nom: true, code: true, sigle: true },
         orderBy: { nom: 'asc' },
       },
       _count: { select: { agents: true } },
@@ -68,42 +80,57 @@ export async function getCommissariat(id: string) {
   if (!c) throw AppError.notFound('Commissariat introuvable', 'COMMISSARIAT_NOT_FOUND');
 
   return {
-    id: c.id,
-    nom: c.nom,
-    code: c.code,
-    departement: c.departement,
-    adresse: c.adresse,
-    parentId: c.parentId,
-    parent: c.parent,
-    enfants: c.enfants,
-    lat: c.lat,
-    lng: c.lng,
-    actif: c.actif,
-    createdAt: c.createdAt,
-    nbAgents: c._count.agents,
+    id:                        c.id,
+    nom:                       c.nom,
+    code:                      c.code,
+    departementCode:           c.departement?.code  ?? null,
+    departementNom:            c.departement?.nom   ?? null,
+    departementId:             c.departementId,
+    directionDepartementaleId: c.directionDepartementaleId,
+    directionDepartementale:   c.directionDepartementale,
+    unites:                    c.unites,
+    // alias "enfants" pour rétrocompatibilité client Flutter
+    enfants:                   c.unites,
+    adresse:                   c.adresse,
+    lat:                       c.lat,
+    lng:                       c.lng,
+    actif:                     c.actif,
+    createdAt:                 c.createdAt,
+    nbAgents:                  c._count.agents,
   };
 }
 
-// ── Creation ───────────────────────────────────────────────────────────────────
+// ── Création ───────────────────────────────────────────────────────────────────
 export async function createCommissariat(body: CreateCommissariatBody, actorId: string) {
-  // Verifier doublon de code
+  // Vérifier doublon de code
   const existing = await prisma.commissariat.findUnique({ where: { code: body.code } });
   if (existing) {
     throw AppError.conflict(
-      `Un commissariat avec le code "${body.code}" existe deja`,
+      `Un commissariat avec le code "${body.code}" existe déjà`,
       'COMMISSARIAT_CODE_EXISTS',
     );
   }
 
-  // Verifier que le parent existe si fourni
-  if (body.parentId) {
-    const parent = await prisma.commissariat.findUnique({ where: { id: body.parentId } });
-    if (!parent) {
-      throw AppError.badRequest('Commissariat parent introuvable', 'PARENT_NOT_FOUND');
+  // Résoudre departement code → departementId
+  const dept = await prisma.departement.findUnique({ where: { code: body.departement } });
+  if (!dept) {
+    throw AppError.badRequest(
+      `Département "${body.departement}" introuvable`,
+      'DEPT_NOT_FOUND',
+    );
+  }
+
+  // Vérifier DD si fournie
+  if (body.directionDepartementaleId) {
+    const dd = await prisma.directionDepartementale.findUnique({
+      where: { id: body.directionDepartementaleId },
+    });
+    if (!dd) {
+      throw AppError.badRequest('Direction départementale introuvable', 'DD_NOT_FOUND');
     }
-    if (parent.departement !== body.departement) {
+    if (dd.departementId !== dept.id) {
       throw AppError.badRequest(
-        'Le commissariat enfant doit etre dans le meme departement que son parent',
+        'La direction départementale doit appartenir au même département',
         'DEPARTMENT_MISMATCH',
       );
     }
@@ -111,14 +138,17 @@ export async function createCommissariat(body: CreateCommissariatBody, actorId: 
 
   const commissariat = await prisma.commissariat.create({
     data: {
-      nom: body.nom,
-      code: body.code,
-      departement: body.departement as never,
-      parentId: body.parentId ?? null,
-      lat: body.lat ?? null,
-      lng: body.lng ?? null,
-      adresse: body.adresse ?? null,
-      actif: true,
+      nom:                      body.nom,
+      code:                     body.code,
+      departementId:            dept.id,
+      directionDepartementaleId: body.directionDepartementaleId ?? null,
+      lat:                      body.lat     ?? null,
+      lng:                      body.lng     ?? null,
+      adresse:                  body.adresse ?? null,
+      actif:                    true,
+    },
+    include: {
+      departement: { select: { code: true, nom: true } },
     },
   });
 
@@ -128,7 +158,18 @@ export async function createCommissariat(body: CreateCommissariatBody, actorId: 
     details: { commissariatId: commissariat.id, code: commissariat.code },
   });
 
-  return commissariat;
+  return {
+    id:              commissariat.id,
+    nom:             commissariat.nom,
+    code:            commissariat.code,
+    departementCode: commissariat.departement?.code ?? null,
+    departementId:   commissariat.departementId,
+    adresse:         commissariat.adresse,
+    lat:             commissariat.lat,
+    lng:             commissariat.lng,
+    actif:           commissariat.actif,
+    createdAt:       commissariat.createdAt,
+  };
 }
 
 // ── Modification ───────────────────────────────────────────────────────────────
@@ -143,11 +184,11 @@ export async function updateCommissariat(
   const updated = await prisma.commissariat.update({
     where: { id },
     data: {
-      ...(body.nom !== undefined ? { nom: body.nom } : {}),
-      ...(body.lat !== undefined ? { lat: body.lat } : {}),
-      ...(body.lng !== undefined ? { lng: body.lng } : {}),
+      ...(body.nom     !== undefined ? { nom:     body.nom     } : {}),
+      ...(body.lat     !== undefined ? { lat:     body.lat     } : {}),
+      ...(body.lng     !== undefined ? { lng:     body.lng     } : {}),
       ...(body.adresse !== undefined ? { adresse: body.adresse } : {}),
-      ...(body.actif !== undefined ? { actif: body.actif } : {}),
+      ...(body.actif   !== undefined ? { actif:   body.actif   } : {}),
     },
   });
 

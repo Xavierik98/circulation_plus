@@ -34,10 +34,9 @@ export async function commissariatsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request) => {
-      const { page, limit, departement, parentId, actif } = request.query;
+      const { page, limit, departement, actif } = request.query;
       const { items, total } = await listCommissariats({
         departement,
-        parentId,
         actif,
         page,
         limit,

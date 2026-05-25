@@ -2,7 +2,6 @@
   "name": "circulation-plus-api",
   "version": "1.0.0",
   "description": "Backend de gestion des contraventions routières — Police Nationale du Congo-Brazzaville",
-  "type": "module",
   "engines": {
     "node": ">=20"
   },

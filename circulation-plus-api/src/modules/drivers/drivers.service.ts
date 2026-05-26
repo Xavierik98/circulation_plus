@@ -32,7 +32,10 @@ export async function findDriver(params: {
       fines: {
         orderBy: { verbaliseLe: 'desc' },
         take: 5,
-        include: { infractionType: true },
+        include: {
+          infractionType: true,
+          officer: { select: { id: true, name: true, badgeNumber: true } },
+        },
       },
     },
   });
@@ -41,5 +44,18 @@ export async function findDriver(params: {
     throw AppError.notFound('Conducteur introuvable', 'DRIVER_NOT_FOUND');
   }
 
-  return driver;
+  // Calcule automatiquement la validité du permis selon la date d'expiration
+  const now = new Date();
+  const isExpired = driver.dateExpirationPermis != null
+    && driver.dateExpirationPermis < now;
+  const isSuspended = driver.permisSuspendu;
+
+  return {
+    ...driver,
+    permisValideComputed: driver.permisValide && !isExpired && !isSuspended,
+    permisExpire: isExpired,
+    joursAvantExpiration: driver.dateExpirationPermis
+      ? Math.ceil((driver.dateExpirationPermis.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : null,
+  };
 }

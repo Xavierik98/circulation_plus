@@ -294,14 +294,23 @@ model InfractionType {
 }
 
 model Driver {
-  id           String   @id @default(uuid())
-  nom          String
-  prenom       String
-  telephone    String
-  numeroPermis String   @unique
-  permisValide Boolean  @default(true)
-  consentement Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id                  String    @id @default(uuid())
+  nom                 String
+  prenom              String
+  telephone           String
+  dateNaissance       DateTime?
+  numeroPermis        String    @unique
+  categoriesPermis    String    @default("B") // ex: "A,B,C"
+  dateDelivrancePermis DateTime?
+  dateExpirationPermis DateTime?
+  lieuDelivrance      String?
+  photoUrl            String?
+  pointsPermis        Int       @default(12)
+  permisValide        Boolean   @default(true)
+  permisSuspendu      Boolean   @default(false)
+  consentement        Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt @default(now())
 
   vehicles     Vehicle[]
   fines        Fine[]

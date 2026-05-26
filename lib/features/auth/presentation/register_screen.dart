@@ -50,10 +50,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final firstName = _firstNameController.text.trim();
     final lastName  = _lastNameController.text.trim();
     final fullName  = '$firstName $lastName'.trim();
+    final phone = _phoneController.text.trim();
     final verificationUrl = await ref.read(authProvider.notifier).register(
       name:      fullName,
       email:     email,
-      telephone: _phoneController.text.trim(),
+      telephone: phone.isEmpty ? null : phone,
       pin:       _pinController.text.trim(),
     );
     if (!mounted) return;

@@ -1396,14 +1396,6 @@ class _CongoFlagDiagonalPainter extends CustomPainter {
       ..close();
     canvas.drawPath(rPath, red);
 
-    // Étoile jaune (haut-gauche du drapeau congolais)
-    _drawStar(
-      canvas,
-      Offset(w - stripeW * 2.55, h * 0.055),
-      h * 0.038,
-      Paint()..color = AppColors.congoYellow,
-    );
-
     canvas.restore();
 
     // Subtle edge shadow to blend with card
@@ -1416,18 +1408,6 @@ class _CongoFlagDiagonalPainter extends CustomPainter {
           end: Alignment.centerLeft,
         ).createShader(Rect.fromLTWH(w - stripeW * 3 - 1, 0, 2, h)),
     );
-  }
-
-  void _drawStar(Canvas canvas, Offset c, double r, Paint p) {
-    final path = Path();
-    for (int i = 0; i < 10; i++) {
-      final a = (i * pi / 5) - pi / 2;
-      final len = i.isEven ? r : r * 0.42;
-      final pt = Offset(c.dx + len * cos(a), c.dy + len * sin(a));
-      i == 0 ? path.moveTo(pt.dx, pt.dy) : path.lineTo(pt.dx, pt.dy);
-    }
-    path.close();
-    canvas.drawPath(path, p);
   }
 
   @override
@@ -1464,18 +1444,6 @@ class _CongoMiniPainter extends CustomPainter {
       ..lineTo(w * 0.22, h)
       ..close();
     canvas.drawPath(red, Paint()..color = AppColors.congoRed);
-
-    // Star
-    final starC = Offset(w * 0.14, h * 0.3);
-    final starPath = Path();
-    for (int i = 0; i < 10; i++) {
-      final a = (i * pi / 5) - pi / 2;
-      final len = i.isEven ? h * 0.14 : h * 0.06;
-      final pt = Offset(starC.dx + len * cos(a), starC.dy + len * sin(a));
-      i == 0 ? starPath.moveTo(pt.dx, pt.dy) : starPath.lineTo(pt.dx, pt.dy);
-    }
-    starPath.close();
-    canvas.drawPath(starPath, Paint()..color = AppColors.congoYellow);
 
     // Border
     canvas.drawRect(

@@ -63,17 +63,18 @@ class AuthRepository {
   Future<Map<String, dynamic>> register(
     String name,
     String email,
-    String telephone,
+    String? telephone,
     String pin,
   ) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'email': email,
+      'pin': pin,
+    };
+    if (telephone != null && telephone.isNotEmpty) body['telephone'] = telephone;
     final data = await _api.post(
       '/api/auth/register',
-      body: {
-        'name': name,
-        'email': email,
-        'telephone': telephone,
-        'pin': pin,
-      },
+      body: body,
     ) as Map<String, dynamic>;
     // Sauvegarder les tokens pour pouvoir appeler /me après vérification
     await _api.saveTokens(

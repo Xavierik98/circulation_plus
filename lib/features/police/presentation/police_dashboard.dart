@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,8 +39,44 @@ class PoliceDashboard extends ConsumerStatefulWidget {
 }
 
 class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
-  bool _onDuty = false;
+  // L'auth passe automatiquement en service à la connexion (_setOnDutyAuto)
+  bool _onDuty = true;
   bool _statusLoading = false;
+  Timer? _gpsTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Envoi immédiat d'un heartbeat GPS dès l'ouverture du dashboard
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sendGpsHeartbeat());
+    // Heartbeat GPS toutes les 30s quand l'agent est en service
+    _gpsTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_onDuty) _sendGpsHeartbeat();
+    });
+  }
+
+  @override
+  void dispose() {
+    _gpsTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _sendGpsHeartbeat() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) return;
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      await ApiClient.instance.patch(
+        '/api/officers/me/location',
+        body: {'lat': pos.latitude, 'lng': pos.longitude},
+      );
+    } catch (_) {
+      // Silencieux — pas d'affichage d'erreur pour le heartbeat
+    }
+  }
 
   Future<void> _toggleDutyStatus() async {
     final newStatus = !_onDuty;

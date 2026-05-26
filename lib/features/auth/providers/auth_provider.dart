@@ -308,7 +308,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<String?> register({
     required String name,
     required String email,
-    required String telephone,
+    String? telephone,
     required String pin,
   }) async {
     state = state.copyWith(isLoading: true, error: null);

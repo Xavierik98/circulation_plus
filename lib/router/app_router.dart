@@ -35,6 +35,7 @@ import '../features/admin/presentation/revenue_dashboard.dart';
 import '../features/admin/presentation/register_agent_screen.dart';
 import '../features/admin/presentation/fines_management_screen.dart';
 import '../features/admin/presentation/security_screen.dart';
+import '../features/police/presentation/license_verify_screen.dart';
 import '../features/auth/presentation/change_password_screen.dart';
 import '../features/auth/presentation/verify_email_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
@@ -183,6 +184,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/police/id-card',
         builder: (_, __) => const PoliceIdCardScreen(),
+      ),
+      GoRoute(
+        path: '/police/license-verify',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return LicenseVerifyScreen(
+            initialLicense: extra?['license'] as String?,
+            initialPlate: extra?['plate'] as String?,
+          );
+        },
       ),
       GoRoute(
         path: '/police/settings',

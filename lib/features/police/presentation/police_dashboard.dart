@@ -516,19 +516,19 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
           children: [
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.search_rounded,
-                label: 'Vérifier\nConducteur',
-                color: AppColors.accent,
-                onTap: () => context.push('/police/history'),
+                icon: Icons.credit_card_rounded,
+                label: 'Vérifier\nPermis',
+                color: AppColors.gold,
+                onTap: () => context.push('/police/license-verify'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.badge_outlined,
-                label: 'Ma\nCarte',
-                color: AppColors.gold,
-                onTap: () => context.push('/police/id-card'),
+                icon: Icons.search_rounded,
+                label: 'Historique\nConducteur',
+                color: AppColors.accent,
+                onTap: () => context.push('/police/history'),
               ),
             ),
             const SizedBox(width: 12),

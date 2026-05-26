@@ -622,3 +622,45 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   await audit(prisma, { userId, action: 'PASSWORD_RESET', ip: null });
 }
+
+// ── Administration : débloquer une IP bannie ──────────────────────────────────
+export async function unblockIp(
+  ip: string,
+  adminUserId: string,
+): Promise<{ unblocked: boolean; wasBlocked: boolean }> {
+  const lockK = ipLockKey(ip);
+  const failK = ipFailKey(ip);
+  const wasLocked  = (await redis.exists(lockK)) === 1;
+  const hadFails   = (await redis.exists(failK)) === 1;
+  if (wasLocked || hadFails) {
+    await redis.del(lockK, failK);
+  }
+  await audit(prisma, {
+    userId: adminUserId,
+    action: 'ADMIN_UNBLOCK_IP',
+    ip,
+  });
+  return { unblocked: true, wasBlocked: wasLocked };
+}
+
+// ── Administration : lister les IPs actuellement bloquées ────────────────────
+export async function listBlockedIps(): Promise<
+  Array<{ ip: string; ttlSeconds: number }>
+> {
+  // Scan des clés ip:lock:* dans Redis
+  const keys: string[] = [];
+  let cursor = '0';
+  do {
+    const [next, batch] = await redis.scan(cursor, 'MATCH', 'ip:lock:*', 'COUNT', 100);
+    keys.push(...batch);
+    cursor = next;
+  } while (cursor !== '0');
+
+  const result: Array<{ ip: string; ttlSeconds: number }> = [];
+  for (const key of keys) {
+    const ttl = await redis.ttl(key);
+    const ip = key.replace('ip:lock:', '');
+    result.push({ ip, ttlSeconds: ttl });
+  }
+  return result.sort((a, b) => b.ttlSeconds - a.ttlSeconds);
+}

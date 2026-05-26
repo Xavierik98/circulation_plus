@@ -12,7 +12,8 @@ import {
   changePasswordSchema,
   resendVerificationSchema,
 } from './auth.schema';
-import { login, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification, updateProfile, uploadProfilePhoto, forgotPassword, resetPassword, registerFcmToken, revokeFcmToken } from './auth.service';
+import { login, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification, updateProfile, uploadProfilePhoto, forgotPassword, resetPassword, registerFcmToken, revokeFcmToken, unblockIp, listBlockedIps } from './auth.service';
+import { requireRole } from '../../shared/middleware/authenticate';
 
 // ── Page HTML retournée après clic sur le lien de vérification ────────────────
 type VerifyResult = 'success' | 'expired' | 'invalid';
@@ -388,6 +389,40 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         await revokeFcmToken(request.user!.id);
       }
       return ok({ updated: true });
+    },
+  );
+
+  // GET /api/auth/admin/blocked-ips — Admin : liste des IPs actuellement bloquées.
+  r.get(
+    '/admin/blocked-ips',
+    {
+      preHandler: [authenticate, requireRole(['ADMIN', 'DIRECTION_GENERALE'])],
+      schema: {
+        tags: ['Auth', 'Admin'],
+        summary: 'Lister les IPs actuellement bloquées (anti-brute-force)',
+        description: 'Rôles : ADMIN / DIRECTION_GENERALE. Retourne les IPs bloquées avec le TTL restant.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async () => ok(await listBlockedIps()),
+  );
+
+  // DELETE /api/auth/admin/blocked-ips/:ip — Admin : débloquer une IP.
+  r.delete(
+    '/admin/blocked-ips/:ip',
+    {
+      preHandler: [authenticate, requireRole(['ADMIN', 'DIRECTION_GENERALE'])],
+      schema: {
+        tags: ['Auth', 'Admin'],
+        summary: 'Débloquer une IP bannie (anti-brute-force)',
+        description: 'Rôles : ADMIN / DIRECTION_GENERALE. Supprime le verrou Redis de l\'IP.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({ ip: z.string().min(1) }),
+      },
+    },
+    async (request) => {
+      const { ip } = request.params as { ip: string };
+      return ok(await unblockIp(ip, request.user!.id));
     },
   );
 

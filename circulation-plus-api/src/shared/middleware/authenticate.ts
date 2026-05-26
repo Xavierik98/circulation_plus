@@ -69,3 +69,19 @@ export async function authenticate(request: FastifyRequest): Promise<void> {
     }
   }
 }
+
+/**
+ * Génère un preHandler qui vérifie que l'utilisateur authentifié
+ * possède l'un des rôles autorisés.
+ * Usage : preHandler: [authenticate, requireRole(['ADMIN'])]
+ */
+export function requireRole(roles: string[]) {
+  return async function (request: FastifyRequest): Promise<void> {
+    if (!request.user || !roles.includes(request.user.role)) {
+      throw AppError.forbidden(
+        `Accès refusé. Rôles requis : ${roles.join(', ')}.`,
+        'FORBIDDEN_ROLE',
+      );
+    }
+  };
+}

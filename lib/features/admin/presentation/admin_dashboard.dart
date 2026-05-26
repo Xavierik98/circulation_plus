@@ -603,6 +603,8 @@ class AdminDashboard extends ConsumerWidget {
        gradient: const LinearGradient(colors: [AppColors.error, Color(0xFFB71C1C)]), route: '__suspensions__'),
       (icon: Icons.bar_chart_rounded, label: 'Revenus',            subtitle: 'Analyse financière',
        gradient: const LinearGradient(colors: [AppColors.accent, AppColors.gold]), route: '/admin/revenue'),
+      (icon: Icons.shield_outlined, label: 'Sécurité',             subtitle: 'IPs bloquées',
+       gradient: const LinearGradient(colors: [Color(0xFF7F1D1D), Color(0xFF450A0A)]), route: '/admin/security'),
     ];
 
     return Column(
@@ -612,7 +614,7 @@ class AdminDashboard extends ConsumerWidget {
         const SizedBox(height: 12),
         GridView.count(
           crossAxisCount: 2,
-          childAspectRatio: 1.8,
+          childAspectRatio: 1.75,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
           shrinkWrap: true,

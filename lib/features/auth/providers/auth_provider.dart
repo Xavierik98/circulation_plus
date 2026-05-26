@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -111,6 +112,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   final AuthRepository _repo;
+
+  // ── Session timeout (30 min d'inactivité) ────────────────────────────────
+  static const _sessionTimeout = Duration(minutes: 30);
+  Timer? _sessionTimer;
+
+  /// Réinitialise le minuteur d'inactivité. À appeler à chaque interaction.
+  void resetSessionTimer() {
+    _sessionTimer?.cancel();
+    if (state.isAuthenticated) {
+      _sessionTimer = Timer(_sessionTimeout, () {
+        debugPrint('[Session] Timeout 30 min — déconnexion automatique');
+        logout();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _sessionTimer?.cancel();
+    super.dispose();
+  }
 
   /// Récupère le token FCM et l'envoie au backend.
   /// Non-bloquant : toute erreur (Firebase non configuré, réseau) est ignorée.
@@ -230,6 +252,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       // Enregistrer le token FCM pour les notifications push.
       _pushFcmToken();
+      // Démarrer le timer de session (30 min d'inactivité → déconnexion).
+      resetSessionTimer();
+      // Passer automatiquement "En service" pour les agents police.
+      if (_roleFromBackend(user['role'] as String?) == UserRole.police) {
+        _setOnDutyAuto(position?.lat, position?.lng);
+      }
       return true;
     } on ApiException catch (e) {
       // Erreur réseau (backend injoignable) → mode démo offline
@@ -248,10 +276,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Mode démo offline : comptes prédéfinis, PIN universel 0000.
   /// Activé automatiquement quand le backend est injoignable.
   bool _loginDemo(String email, String pin) {
-    if (pin != 'Demo@1234!') {
+    if (pin != 'Admin@1234!') {
       state = state.copyWith(
         isLoading: false,
-        error: 'Backend injoignable — Mode démo : utilisez le mot de passe "Demo@1234!"',
+        error: 'Backend injoignable — Mode démo : utilisez le mot de passe "Admin@1234!"',
       );
       return false;
     }
@@ -261,7 +289,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         error: 'Backend injoignable — Mode démo\n'
             'Comptes : agent1@pnc.cg · citoyen1@pnc.cg · admin@pnc.cg\n'
-            'Mot de passe : Demo@1234!',
+            'Mot de passe : Admin@1234!',
       );
       return false;
     }
@@ -339,6 +367,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           badgeNumber: user['badgeNumber'] as String?,
           telephone: user['telephone'] as String?,
           email: user['email'] as String?,
+          photoUrl: user['photoUrl'] as String?,
           mustChangePassword: user['mustChangePassword'] as bool? ?? false,
           emailVerified: true,
         );
@@ -399,6 +428,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Passe automatiquement un agent en "En service" juste après sa connexion.
+  /// Non-bloquant : toute erreur réseau est ignorée.
+  void _setOnDutyAuto(double? lat, double? lng) {
+    ApiClient.instance.post(
+      '/api/officers/me/status',
+      body: {
+        'onDuty': true,
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+      },
+    ).catchError((_) {});
+  }
+
   /// Enregistre le token FCM reçu de firebase_messaging.
   /// À appeler après que le plugin firebase_messaging fournit le token.
   /// Ex: FirebaseMessaging.instance.getToken().then((t) => auth.notifier.registerFcmToken(t))
@@ -412,8 +454,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    _sessionTimer?.cancel();
     // Révoquer le token FCM avant la déconnexion (bonnes pratiques)
     try { await _repo.updateFcmToken(null); } catch (_) {}
+    // Passer hors service si policier
+    try {
+      await ApiClient.instance.post('/api/officers/me/status', body: {'onDuty': false});
+    } catch (_) {}
     await _repo.logout();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.prefUserRole);

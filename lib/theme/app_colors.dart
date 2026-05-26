@@ -1,5 +1,32 @@
 import 'package:flutter/material.dart';
 
+/// Theme-aware color accessor. Usage: `context.col.bg`
+extension AppColorsContext on BuildContext {
+  _AdaptiveColors get col => _AdaptiveColors(this);
+}
+
+class _AdaptiveColors {
+  final BuildContext _ctx;
+  const _AdaptiveColors(this._ctx);
+
+  bool get _dark => Theme.of(_ctx).brightness == Brightness.dark;
+
+  // Backgrounds
+  Color get bg           => _dark ? AppColors.background      : const Color(0xFFF4F6FA);
+  Color get surface      => _dark ? AppColors.surface         : const Color(0xFFFFFFFF);
+  Color get surfaceVar   => _dark ? AppColors.surfaceVariant  : const Color(0xFFF1F5F9);
+  Color get cardBg       => _dark ? AppColors.cardBackground  : const Color(0xFFFFFFFF);
+  Color get cardBorder   => _dark ? AppColors.cardBorder      : const Color(0xFFE2E8F0);
+
+  // Text
+  Color get textPrimary  => _dark ? AppColors.textPrimary     : const Color(0xFF0F172A);
+  Color get textSec      => _dark ? AppColors.textSecondary   : const Color(0xFF475569);
+  Color get textTer      => _dark ? AppColors.textTertiary    : const Color(0xFF94A3B8);
+
+  // Divider
+  Color get divider      => _dark ? AppColors.divider         : const Color(0xFFE2E8F0);
+}
+
 class AppColors {
   AppColors._();
 

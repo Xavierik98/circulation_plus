@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +23,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   bool _isScanning = false;
   bool _scanComplete = false;
   String _scanType = 'license';
-  String? _imagePath;
+  String? _imagePath;      // blob URL (web) or file path (native)
+  Uint8List? _imageBytes;  // bytes for non-web display
 
   @override
   void initState() {
@@ -51,8 +53,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       );
       if (!mounted) return;
       if (image != null) {
+        final bytes = kIsWeb ? await image.readAsBytes() : null;
         setState(() {
-          _imagePath = image.path;
+          _imagePath = image.path; // blob URL on web, file path on native
+          _imageBytes = bytes;
           _scanComplete = true;
         });
         // Sauvegarder dans l'état de l'interpellation
@@ -252,10 +256,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
             // Fond grille ou image capturée
             if (_imagePath != null)
               Positioned.fill(
-                child: Image.file(
-                  File(_imagePath!),
-                  fit: BoxFit.cover,
-                ),
+                child: _imageBytes != null
+                    ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                    : Image.network(_imagePath!, fit: BoxFit.cover),
               )
             else
               CustomPaint(

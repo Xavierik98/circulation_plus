@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,13 +21,14 @@ void main() async {
   // ── Firebase ──────────────────────────────────────────────────────────────
   // Initialisation non-bloquante : l'app fonctionne même si Firebase n'est
   // pas encore configuré (google-services.json placeholder).
-  try {
-    await Firebase.initializeApp();
-    // Enregistrer le handler pour les messages reçus en background / terminated.
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  } catch (e) {
-    debugPrint('[FCM] Firebase non initialisé : $e');
-    // L'application continue sans les notifications push.
+  // Firebase désactivé sur web (config mobile uniquement)
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    } catch (e) {
+      debugPrint('[FCM] Firebase non initialisé : $e');
+    }
   }
 
   // ── Orientation & style système ───────────────────────────────────────────

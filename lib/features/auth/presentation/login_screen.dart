@@ -98,11 +98,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final col = context.col;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: col.bg,
       body: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _LoginBgPainter(_userRole))),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _LoginBgPainter(_userRole, Theme.of(context).brightness),
+            ),
+          ),
           Positioned(
             top: 0, left: 0, right: 0,
             child: Container(height: 3, decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient)),
@@ -121,12 +126,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
+                        color: col.surfaceVar,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.cardBorder),
+                        border: Border.all(color: col.cardBorder),
                       ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 16, color: AppColors.textPrimary),
+                      child: Icon(Icons.arrow_back_ios_new_rounded,
+                          size: 16, color: col.textPrimary),
                     ),
                   ).animate().fadeIn(),
 
@@ -251,7 +256,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
                         Text('Admin   →  admin@pnc.cg',
                             style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
-                        Text('Mot de passe démo : Demo@1234!',
+                        Text('Mot de passe démo : Admin@1234!',
                             style: AppTextStyles.caption.copyWith(
                                 color: AppColors.primary, fontWeight: FontWeight.w500)),
                       ],
@@ -349,7 +354,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
 class _LoginBgPainter extends CustomPainter {
   final UserRole role;
-  _LoginBgPainter(this.role);
+  final Brightness brightness;
+  _LoginBgPainter(this.role, this.brightness);
 
   @override
   void paint(Canvas canvas, Size size) {

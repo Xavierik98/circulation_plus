@@ -14,6 +14,10 @@ const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 jours
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCK_TTL_SECONDS = 15 * 60; // 15 minutes
 
+// ── IP-level brute-force protection ───────────────────────────────────────────
+const MAX_IP_FAILED_ATTEMPTS = 10;   // 10 failed logins from same IP → block
+const IP_LOCK_TTL_SECONDS    = 30 * 60; // 30 minutes
+
 const ROLE_MAP: Record<'police' | 'citizen' | 'admin', Role> = {
   police: 'POLICE',
   citizen: 'CITOYEN',
@@ -32,6 +36,12 @@ function failKey(email: string): string {
 }
 function lockKey(email: string): string {
   return `auth:lock:${email}`;
+}
+function ipFailKey(ip: string): string {
+  return `ip:fail:${ip}`;
+}
+function ipLockKey(ip: string): string {
+  return `ip:lock:${ip}`;
 }
 function refreshKey(userId: string, jti: string): string {
   return `refresh:${userId}:${jti}`;
@@ -138,6 +148,14 @@ export async function login(
     );
   }
 
+  // 0b. Blocage IP (protection OWASP — credential stuffing / distributed brute-force).
+  if (ip && await redis.exists(ipLockKey(ip))) {
+    throw AppError.tooManyRequests(
+      'Trop de tentatives échouées depuis votre réseau. Réessayez dans 30 minutes.',
+      'IP_BLOCKED',
+    );
+  }
+
   // 1. Vérrou de compte (sans toucher la base).
   if (await redis.exists(lockKey(email))) {
     throw AppError.tooManyRequests(
@@ -156,6 +174,7 @@ export async function login(
     (await bcrypt.compare(pin, user.pinHash));
 
   if (!credentialsValid) {
+    // Per-account brute force
     const attempts = await redis.incr(failKey(email));
     if (attempts === 1) {
       await redis.expire(failKey(email), LOCK_TTL_SECONDS);
@@ -168,10 +187,29 @@ export async function login(
         'ACCOUNT_LOCKED',
       );
     }
+
+    // Per-IP brute force (credential stuffing protection)
+    if (ip) {
+      const ipAttempts = await redis.incr(ipFailKey(ip));
+      if (ipAttempts === 1) {
+        await redis.expire(ipFailKey(ip), IP_LOCK_TTL_SECONDS);
+      }
+      if (ipAttempts >= MAX_IP_FAILED_ATTEMPTS) {
+        await redis.set(ipLockKey(ip), '1', 'EX', IP_LOCK_TTL_SECONDS);
+        await redis.del(ipFailKey(ip));
+        throw AppError.tooManyRequests(
+          'IP bloquée 30 minutes — trop de tentatives échouées.',
+          'IP_BLOCKED',
+        );
+      }
+    }
+
     throw AppError.unauthorized('Email, PIN ou rôle invalide', 'INVALID_CREDENTIALS');
   }
 
+  // On success: clear both email and IP fail counters
   await redis.del(failKey(email));
+  if (ip) await redis.del(ipFailKey(ip));
 
   // Email non vérifié : bloquer uniquement les CITOYEN (les agents sont créés par l'admin)
   if (user.role === 'CITOYEN' && !user.emailVerified) {

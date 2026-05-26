@@ -17,7 +17,8 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController       = TextEditingController();
+  final _firstNameController  = TextEditingController();
+  final _lastNameController   = TextEditingController();
   final _emailController      = TextEditingController();
   final _phoneController      = TextEditingController();
   final _pinController        = TextEditingController();
@@ -28,7 +29,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _pinController.dispose();
@@ -45,8 +47,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     setState(() => _isLoading = true);
     final email = _emailController.text.trim();
+    final firstName = _firstNameController.text.trim();
+    final lastName  = _lastNameController.text.trim();
+    final fullName  = '$firstName $lastName'.trim();
     final verificationUrl = await ref.read(authProvider.notifier).register(
-      name:      _nameController.text.trim(),
+      name:      fullName,
       email:     email,
       telephone: _phoneController.text.trim(),
       pin:       _pinController.text.trim(),
@@ -78,8 +83,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final col = context.col;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: col.bg,
       body: Stack(
         children: [
           // Fond dégradé vert citoyen
@@ -110,12 +116,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       child: Container(
                         width: 42, height: 42,
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
+                          color: col.surfaceVar,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.cardBorder),
+                          border: Border.all(color: col.cardBorder),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
-                            size: 16, color: AppColors.textPrimary),
+                        child: Icon(Icons.arrow_back_ios_new_rounded,
+                            size: 16, color: col.textPrimary),
                       ),
                     ).animate().fadeIn(),
 
@@ -157,21 +163,59 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Nom complet
-                    _label('Nom complet'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      style: AppTextStyles.bodyMedium
-                          .copyWith(color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
-                        hintText: 'Ex : Marie Samba',
-                        prefixIcon: Icon(Icons.person_outline_rounded,
-                            color: AppColors.congoGreen, size: 20),
-                      ),
-                      validator: (v) =>
-                          (v == null || v.trim().length < 2) ? 'Nom trop court' : null,
+                    // Prénom + Nom côte à côte
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('Prénom *'),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _firstNameController,
+                                textCapitalization: TextCapitalization.words,
+                                style: AppTextStyles.bodyMedium
+                                    .copyWith(color: AppColors.textPrimary),
+                                decoration: const InputDecoration(
+                                  hintText: 'Ex : Marie',
+                                  prefixIcon: Icon(Icons.person_outline_rounded,
+                                      color: AppColors.congoGreen, size: 20),
+                                ),
+                                validator: (v) =>
+                                    (v == null || v.trim().length < 2)
+                                        ? 'Requis'
+                                        : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('Nom *'),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _lastNameController,
+                                textCapitalization: TextCapitalization.words,
+                                style: AppTextStyles.bodyMedium
+                                    .copyWith(color: AppColors.textPrimary),
+                                decoration: const InputDecoration(
+                                  hintText: 'Ex : Samba',
+                                  prefixIcon: Icon(Icons.badge_outlined,
+                                      color: AppColors.congoGreen, size: 20),
+                                ),
+                                validator: (v) =>
+                                    (v == null || v.trim().length < 2)
+                                        ? 'Requis'
+                                        : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ).animate().fadeIn(delay: 300.ms),
 
                     const SizedBox(height: 18),

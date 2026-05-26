@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -229,12 +229,16 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: Image.file(
-                          File(scanPath),
-                          width: 100,
-                          height: 65,
-                          fit: BoxFit.cover,
-                        ),
+                        child: kIsWeb
+                            ? Image.network(
+                                scanPath,
+                                width: 100,
+                                height: 65,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox(width: 100, height: 65),
+                              )
+                            : _buildNativeImage(scanPath),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -661,6 +665,29 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
             inactiveThumbColor: AppColors.error,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNativeImage(String path) {
+    // On web this branch is never called (kIsWeb guard above).
+    // On native, path is a valid filesystem path.
+    return Image.network(
+      // Use network as universal fallback — native apps can use
+      // file:// scheme or we rely on Image.network error handling.
+      path.startsWith('/') || path.contains(':\\')
+          ? Uri.file(path).toString()
+          : path,
+      width: 100,
+      height: 65,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        width: 100, height: 65,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(Icons.image_rounded, color: AppColors.textTertiary),
       ),
     );
   }

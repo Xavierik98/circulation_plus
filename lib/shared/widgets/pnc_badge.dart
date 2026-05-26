@@ -4,8 +4,7 @@ import '../../theme/app_colors.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PncArmoirie — armoirie complète de la Police Nationale du Congo
-// Cercle or → fond marine → étoiles → bouclier bicolore → lauriers → texte
-// Utilisation : PncArmoirie(size: 120)
+// Utilisation : PncArmoirie(size: 140)
 // ─────────────────────────────────────────────────────────────────────────────
 class PncArmoirie extends StatelessWidget {
   final double size;
@@ -22,7 +21,7 @@ class PncArmoirie extends StatelessWidget {
   }
 }
 
-/// Peintre public pour l'armoirie PNC (accessible dans les autres écrans).
+/// Peintre public pour l'armoirie PNC.
 class PncArmoiriePainter extends CustomPainter {
   final bool showGlow;
   const PncArmoiriePainter({this.showGlow = true});
@@ -30,9 +29,8 @@ class PncArmoiriePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
-    final h = size.height;
     final cx = w / 2;
-    final cy = h / 2;
+    final cy = size.height / 2;
     final r  = w / 2;
 
     // ── Halo extérieur ────────────────────────────────────────────────────
@@ -40,178 +38,219 @@ class PncArmoiriePainter extends CustomPainter {
       canvas.drawCircle(
         Offset(cx, cy), r,
         Paint()..shader = RadialGradient(colors: [
-          AppColors.congoYellow.withValues(alpha: 0.28),
+          AppColors.gold.withValues(alpha: 0.35),
           Colors.transparent,
         ]).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r)),
       );
     }
 
-    // ── Anneau extérieur or ───────────────────────────────────────────────
-    canvas.drawCircle(Offset(cx, cy), r * 0.96,
-        Paint()..color = AppColors.gold
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = w * 0.055);
+    // ── Anneau extérieur or (épais, bien visible) ─────────────────────────
+    canvas.drawCircle(Offset(cx, cy), r * 0.95,
+        Paint()
+          ..color = AppColors.gold
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.07);  // 8.4px @ 120 — visible
 
-    // ── Fond marine ───────────────────────────────────────────────────────
-    canvas.drawCircle(Offset(cx, cy), r * 0.88,
+    // ── Fond marine foncé ─────────────────────────────────────────────────
+    canvas.drawCircle(Offset(cx, cy), r * 0.855,
         Paint()..color = AppColors.policeNavy);
 
-    // ── Anneau intérieur or fin ───────────────────────────────────────────
-    canvas.drawCircle(Offset(cx, cy), r * 0.80,
-        Paint()..color = AppColors.gold.withValues(alpha: 0.5)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = w * 0.013);
+    // ── Anneau intérieur or (séparateur) ──────────────────────────────────
+    canvas.drawCircle(Offset(cx, cy), r * 0.775,
+        Paint()
+          ..color = AppColors.gold.withValues(alpha: 0.65)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.018);  // 2.2px @ 120
+
+    // ── Zone texte circulaire (bande entre les deux anneaux) ──────────────
+    _drawCircularText(canvas, Offset(cx, cy), r * 0.815, size);
 
     // ── Bandes tricolores Congo (3 arcs en bas) ───────────────────────────
-    _drawCongoArcs(canvas, Offset(cx, cy), r * 0.78);
+    _drawCongoArcs(canvas, Offset(cx, cy), r * 0.74);
 
-    // ── 5 étoiles en arc au-dessus du bouclier ────────────────────────────
+    // ── 5 étoiles or en arc au-dessus du bouclier ─────────────────────────
     final starPaint = Paint()..color = AppColors.congoYellow;
     for (int i = 0; i < 5; i++) {
-      final angle = -math.pi * 0.82 + (math.pi * 0.64) * i / 4;
-      final sc = Offset(cx + (r * 0.60) * math.cos(angle),
-                        cy + (r * 0.60) * math.sin(angle) - r * 0.04);
-      _drawStar(canvas, sc, r * 0.058, starPaint);
+      final angle = -math.pi * 0.80 + (math.pi * 0.60) * i / 4;
+      final sc = Offset(
+        cx + (r * 0.55) * math.cos(angle),
+        cy + (r * 0.55) * math.sin(angle) - r * 0.05,
+      );
+      _drawStar(canvas, sc, r * 0.10, starPaint);  // 6px @ 120 — visible !
     }
 
-    // ── Bouclier central ─────────────────────────────────────────────────
-    _drawShield(canvas, Offset(cx, cy + r * 0.08), r * 0.42);
+    // ── Bouclier central ──────────────────────────────────────────────────
+    _drawShield(canvas, Offset(cx, cy + r * 0.06), r * 0.40);
 
     // ── Lauriers de chaque côté ───────────────────────────────────────────
-    _drawLaurel(canvas, Offset(cx, cy + r * 0.08), r * 0.75, isLeft: true);
-    _drawLaurel(canvas, Offset(cx, cy + r * 0.08), r * 0.75, isLeft: false);
-
-    // ── Texte circulaire "POLICE NATIONALE DU CONGO" ──────────────────────
-    _drawCircularText(canvas, Offset(cx, cy), r * 0.88, size);
+    _drawLaurel(canvas, Offset(cx, cy + r * 0.06), r * 0.72, isLeft: true);
+    _drawLaurel(canvas, Offset(cx, cy + r * 0.06), r * 0.72, isLeft: false);
   }
 
+  // ─── Arcs tricolores Congo ─────────────────────────────────────────────────
   void _drawCongoArcs(Canvas canvas, Offset c, double r) {
     final colors = [AppColors.congoGreen, AppColors.congoYellow, AppColors.congoRed];
-    const startAngle = math.pi * 0.62;
-    const totalSweep = math.pi * 0.76;
+    const startAngle = math.pi * 0.60;
+    const totalSweep = math.pi * 0.80;
     final rect = Rect.fromCircle(center: c, radius: r);
     for (int i = 0; i < 3; i++) {
-      canvas.drawArc(rect,
+      canvas.drawArc(
+        rect,
         startAngle + totalSweep / 3 * i,
         totalSweep / 3,
         false,
-        Paint()..color = colors[i].withValues(alpha: 0.9)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 4
-            ..strokeCap = StrokeCap.butt,
+        Paint()
+          ..color = colors[i]
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.095   // proportionnel au rayon
+          ..strokeCap = StrokeCap.butt,
       );
     }
   }
 
+  // ─── Bouclier bicolore vert/rouge + diagonale jaune + "PNC" ──────────────────
   void _drawShield(Canvas canvas, Offset c, double r) {
     final path = Path()
-      ..moveTo(c.dx - r,       c.dy - r * 0.9)
-      ..lineTo(c.dx + r,       c.dy - r * 0.9)
-      ..lineTo(c.dx + r,       c.dy + r * 0.1)
-      ..quadraticBezierTo(c.dx + r, c.dy + r * 1.05, c.dx, c.dy + r)
-      ..quadraticBezierTo(c.dx - r, c.dy + r * 1.05, c.dx - r, c.dy + r * 0.1)
+      ..moveTo(c.dx - r,       c.dy - r * 0.85)
+      ..lineTo(c.dx + r,       c.dy - r * 0.85)
+      ..lineTo(c.dx + r,       c.dy + r * 0.05)
+      ..quadraticBezierTo(c.dx + r, c.dy + r * 1.0, c.dx, c.dy + r)
+      ..quadraticBezierTo(c.dx - r, c.dy + r * 1.0, c.dx - r, c.dy + r * 0.05)
       ..close();
 
-    // Fond bicolore vert/rouge (drapeau Congo)
-    canvas.drawPath(path, Paint()..shader = LinearGradient(
-      colors: [AppColors.congoGreen.withValues(alpha: 0.85),
-               AppColors.congoRed.withValues(alpha: 0.85)],
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-    ).createShader(Rect.fromLTWH(c.dx - r, c.dy - r, r * 2, r * 2)));
+    // Fond vert/rouge (drapeau Congo)
+    canvas.drawPath(path, Paint()
+      ..shader = LinearGradient(
+        colors: [AppColors.congoGreen, AppColors.congoRed],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(Rect.fromLTWH(c.dx - r, c.dy - r, r * 2, r * 2)));
 
-    // Bande jaune diagonale
+    // Diagonale jaune
+    canvas.save();
+    canvas.clipPath(path);
     final diagPath = Path()
-      ..moveTo(c.dx - r * 0.15, c.dy - r * 0.9)
-      ..lineTo(c.dx + r * 0.15, c.dy - r * 0.9)
-      ..lineTo(c.dx + r * 0.6,  c.dy + r * 0.9)
-      ..lineTo(c.dx - r * 0.6,  c.dy + r * 0.9)
+      ..moveTo(c.dx - r * 0.18, c.dy - r * 0.85)
+      ..lineTo(c.dx + r * 0.18, c.dy - r * 0.85)
+      ..lineTo(c.dx + r * 0.65, c.dy + r)
+      ..lineTo(c.dx - r * 0.65, c.dy + r)
       ..close();
     canvas.drawPath(diagPath,
-        Paint()..color = AppColors.congoYellow.withValues(alpha: 0.70));
+        Paint()..color = AppColors.congoYellow.withValues(alpha: 0.85));
+    canvas.restore();
 
-    // Bordure or
+    // Bordure or épaisse
     canvas.drawPath(path,
-        Paint()..color = AppColors.gold
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = r * 0.10);
+        Paint()
+          ..color = AppColors.gold
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.12);
 
-    // Texte "PNC"
+    // Texte "PNC" blanc en gras
+    final fontSize = (r * 0.58).clamp(9.0, 36.0);
     final tp = TextPainter(
       text: TextSpan(
         text: 'PNC',
         style: TextStyle(
           color: Colors.white,
-          fontSize: r * 0.52,
+          fontSize: fontSize,
           fontWeight: FontWeight.w900,
-          letterSpacing: r * 0.12,
-          shadows: const [Shadow(color: Colors.black38, blurRadius: 4)],
+          letterSpacing: fontSize * 0.18,
+          shadows: const [
+            Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(0, 1))
+          ],
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(canvas, Offset(c.dx - tp.width / 2, c.dy - tp.height / 2 + r * 0.10));
+    tp.paint(canvas,
+        Offset(c.dx - tp.width / 2, c.dy - tp.height / 2 + r * 0.08));
   }
 
+  // ─── Lauriers ──────────────────────────────────────────────────────────────
   void _drawLaurel(Canvas canvas, Offset c, double r, {required bool isLeft}) {
     final paint = Paint()
-      ..color = AppColors.congoGreen.withValues(alpha: 0.70)
+      ..color = AppColors.congoGreen.withValues(alpha: 0.85)
       ..style = PaintingStyle.fill;
     final side = isLeft ? -1.0 : 1.0;
-    for (int i = 0; i < 6; i++) {
+    const leafCount = 7;
+    for (int i = 0; i < leafCount; i++) {
+      final t = i / (leafCount - 1);
       final angle = isLeft
-          ? math.pi * 0.35 + (math.pi * 0.55) * i / 5
-          : math.pi * 0.10 - (math.pi * 0.55) * i / 5;
+          ? math.pi * 0.30 + (math.pi * 0.60) * t
+          : math.pi * 0.10 - (math.pi * 0.60) * t;
+      final dist = r * (0.62 + i * 0.015);
       final leafC = Offset(
-        c.dx + side * r * (0.65 + i * 0.02) * math.cos(angle),
-        c.dy + r * 0.65 * math.sin(angle) + r * 0.15,
+        c.dx + side * dist * math.cos(angle),
+        c.dy + dist * math.sin(angle) + r * 0.10,
       );
-      final leafPath = Path()
-        ..addOval(Rect.fromCenter(center: leafC, width: r * 0.18, height: r * 0.10));
+      final leafW = r * 0.26;
+      final leafH = r * 0.14;
       canvas
         ..save()
         ..translate(leafC.dx, leafC.dy)
-        ..rotate(angle + (isLeft ? -math.pi / 4 : math.pi / 4))
-        ..translate(-leafC.dx, -leafC.dy)
-        ..drawPath(leafPath, paint)
+        ..rotate(angle + (isLeft ? -math.pi * 0.35 : math.pi * 0.35))
+        ..drawOval(
+            Rect.fromCenter(
+                center: Offset.zero, width: leafW, height: leafH),
+            paint)
         ..restore();
     }
+    // Tige
+    final stemPaint = Paint()
+      ..color = AppColors.congoGreen.withValues(alpha: 0.6)
+      ..strokeWidth = r * 0.03
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(c.dx + side * r * 0.62, c.dy + r * 0.55),
+      Offset(c.dx + side * r * 0.72, c.dy - r * 0.12),
+      stemPaint,
+    );
   }
 
+  // ─── Étoile à 5 branches ───────────────────────────────────────────────────
   void _drawStar(Canvas canvas, Offset c, double r, Paint paint) {
     final path = Path();
     for (int i = 0; i < 10; i++) {
       final angle = (i * math.pi / 5) - math.pi / 2;
-      final len = i.isEven ? r : r * 0.4;
+      final len = i.isEven ? r : r * 0.42;
       final pt = Offset(c.dx + len * math.cos(angle), c.dy + len * math.sin(angle));
       i == 0 ? path.moveTo(pt.dx, pt.dy) : path.lineTo(pt.dx, pt.dy);
     }
     path.close();
     canvas.drawPath(path, paint);
+    // Contour léger pour le relief
+    canvas.drawPath(path,
+        Paint()
+          ..color = AppColors.gold.withValues(alpha: 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.15);
   }
 
+  // ─── Texte circulaire entre les deux anneaux ──────────────────────────────
   void _drawCircularText(Canvas canvas, Offset c, double r, Size size) {
+    // Texte court pour rester lisible — un seul tour complet
     const text = 'POLICE NATIONALE DU CONGO • CIRCULATION+ •';
+    final fs = (size.width * 0.085).clamp(7.0, 14.0);  // 10.2px @ 120
     final angleStep = (2 * math.pi) / text.length;
     final startAngle = -math.pi / 2 - text.length * angleStep / 2;
 
     for (int i = 0; i < text.length; i++) {
       final angle = startAngle + i * angleStep;
-      final charOffset = Offset(
-        c.dx + r * 0.90 * math.cos(angle),
-        c.dy + r * 0.90 * math.sin(angle),
-      );
+      final charX = c.dx + r * math.cos(angle);
+      final charY = c.dy + r * math.sin(angle);
       canvas
         ..save()
-        ..translate(charOffset.dx, charOffset.dy)
+        ..translate(charX, charY)
         ..rotate(angle + math.pi / 2);
       final tp = TextPainter(
         text: TextSpan(
           text: text[i],
           style: TextStyle(
-            color: AppColors.gold.withValues(alpha: 0.80),
-            fontSize: size.width * 0.062,
-            fontWeight: FontWeight.w700,
+            color: AppColors.gold,
+            fontSize: fs,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
           ),
         ),
@@ -227,7 +266,7 @@ class PncArmoiriePainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PncBadge — badge simplifié (login screen, AppBar, cartes)
+// PncBadge — badge simplifié (AppBar, login, petits contextes)
 // ─────────────────────────────────────────────────────────────────────────────
 class PncBadge extends StatelessWidget {
   final double size;
@@ -256,60 +295,52 @@ class _PncBadgePainter extends CustomPainter {
 
     if (showGlow) {
       canvas.drawCircle(center, r,
-        Paint()..shader = RadialGradient(
-          colors: [AppColors.gold.withValues(alpha: 0.25), Colors.transparent],
-        ).createShader(Rect.fromCircle(center: center, radius: r)));
+          Paint()..shader = RadialGradient(
+            colors: [AppColors.gold.withValues(alpha: 0.30), Colors.transparent],
+          ).createShader(Rect.fromCircle(center: center, radius: r)));
     }
 
-    // Outer gold ring
-    canvas.drawCircle(center, r - w * 0.02,
+    canvas.drawCircle(center, r * 0.95,
         Paint()..color = AppColors.gold
             ..style = PaintingStyle.stroke
-            ..strokeWidth = w * 0.045);
+            ..strokeWidth = w * 0.065);
 
-    // Navy fill
-    canvas.drawCircle(center, r - w * 0.065,
+    canvas.drawCircle(center, r * 0.855,
         Paint()..color = AppColors.policeNavy);
 
-    // Inner gold ring
-    canvas.drawCircle(center, r - w * 0.15,
-        Paint()..color = AppColors.gold.withValues(alpha: 0.45)
+    canvas.drawCircle(center, r * 0.775,
+        Paint()..color = AppColors.gold.withValues(alpha: 0.5)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = w * 0.012);
+            ..strokeWidth = w * 0.015);
 
-    // Congo flag stripe
-    _drawCongoStripe(canvas, center, r - w * 0.165);
+    _drawCongoStripe(canvas, center, r * 0.73);
+    _drawShield(canvas, Offset(center.dx, center.dy + r * 0.06), r * 0.42);
 
-    // Shield
-    _drawShield(canvas, Offset(center.dx, center.dy + r * 0.06), r * 0.44);
-
-    // 5 stars
     final starPaint = Paint()..color = AppColors.gold;
     for (int i = 0; i < 5; i++) {
-      final angle = -math.pi * 0.88 + (math.pi * 0.76) * i / 4;
+      final angle = -math.pi * 0.82 + (math.pi * 0.64) * i / 4;
       final sc = Offset(
-        center.dx + (r * 0.6) * math.cos(angle),
-        center.dy + (r * 0.6) * math.sin(angle) - r * 0.08,
+        center.dx + (r * 0.60) * math.cos(angle),
+        center.dy + (r * 0.60) * math.sin(angle) - r * 0.08,
       );
-      _drawStar(canvas, sc, r * 0.055, starPaint);
+      _drawStar(canvas, sc, r * 0.095, starPaint);
     }
   }
 
   void _drawCongoStripe(Canvas canvas, Offset center, double r) {
-    const sweepAngle = math.pi * 0.5;
-    const startAngle = math.pi * 0.65;
+    const sweepAngle = math.pi * 0.55;
+    const startAngle = math.pi * 0.60;
     final rect = Rect.fromCircle(center: center, radius: r);
     final colors = [AppColors.congoGreen, AppColors.congoYellow, AppColors.congoRed];
     for (int i = 0; i < 3; i++) {
       canvas.drawArc(rect,
-        startAngle + (sweepAngle / 3) * i,
-        sweepAngle / 3,
-        false,
-        Paint()..color = colors[i].withValues(alpha: 0.85)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3.0
-            ..strokeCap = StrokeCap.butt,
-      );
+          startAngle + (sweepAngle / 3) * i,
+          sweepAngle / 3,
+          false,
+          Paint()..color = colors[i]
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = r * 0.10
+              ..strokeCap = StrokeCap.butt);
     }
   }
 
@@ -321,38 +352,41 @@ class _PncBadgePainter extends CustomPainter {
       ..quadraticBezierTo(
           center.dx + r * 0.9, center.dy + r * 1.1, center.dx, center.dy + r)
       ..quadraticBezierTo(
-          center.dx - r * 0.9, center.dy + r * 1.1, center.dx - r * 0.9, center.dy + r * 0.1)
+          center.dx - r * 0.9, center.dy + r * 1.1,
+          center.dx - r * 0.9, center.dy + r * 0.1)
       ..close();
 
     canvas.drawPath(path, Paint()..color = AppColors.policeBlue);
     canvas.drawPath(path,
         Paint()..color = AppColors.gold
             ..style = PaintingStyle.stroke
-            ..strokeWidth = r * 0.08);
+            ..strokeWidth = r * 0.09);
 
     final tp = TextPainter(
       text: TextSpan(
         text: 'PNC',
         style: TextStyle(
           color: AppColors.gold,
-          fontSize: r * 0.58,
+          fontSize: (r * 0.58).clamp(7.0, 28.0),
           fontWeight: FontWeight.w900,
-          letterSpacing: r * 0.1,
+          letterSpacing: r * 0.10,
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas,
-        Offset(center.dx - tp.width / 2, center.dy - tp.height / 2 + r * 0.12));
+        Offset(center.dx - tp.width / 2,
+               center.dy - tp.height / 2 + r * 0.12));
   }
 
   void _drawStar(Canvas canvas, Offset center, double radius, Paint paint) {
     final path = Path();
     for (int i = 0; i < 10; i++) {
       final angle = (i * math.pi / 5) - math.pi / 2;
-      final len = i.isEven ? radius : radius * 0.4;
+      final len = i.isEven ? radius : radius * 0.42;
       final pt = Offset(
-          center.dx + len * math.cos(angle), center.dy + len * math.sin(angle));
+          center.dx + len * math.cos(angle),
+          center.dy + len * math.sin(angle));
       i == 0 ? path.moveTo(pt.dx, pt.dy) : path.lineTo(pt.dx, pt.dy);
     }
     path.close();

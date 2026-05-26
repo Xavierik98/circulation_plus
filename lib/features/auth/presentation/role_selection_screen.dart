@@ -30,12 +30,12 @@ class RoleSelectionScreen extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.transparent,
-                    AppColors.policeNavy.withValues(alpha: 0.55),
-                    AppColors.policeNavy.withValues(alpha: 0.92),
+                    AppColors.policeNavy.withValues(alpha: 0.15),
+                    AppColors.policeNavy.withValues(alpha: 0.40),
+                    AppColors.policeNavy.withValues(alpha: 0.85),
                     AppColors.policeNavy,
                   ],
-                  stops: const [0.0, 0.25, 0.55, 1.0],
+                  stops: const [0.0, 0.30, 0.60, 1.0],
                 ),
               ),
             ),
@@ -61,11 +61,25 @@ class RoleSelectionScreen extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Armoirie PNC grande
-                        const PncArmoirie(size: 120, showGlow: true)
+                        // Armoirie PNC grande — fond lumineux derrière
+                        Container(
+                          width: 148,
+                          height: 148,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.gold.withValues(alpha: 0.30),
+                                blurRadius: 40,
+                                spreadRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const PncArmoirie(size: 148, showGlow: true),
+                        )
                             .animate()
                             .fadeIn(duration: 700.ms)
-                            .scale(begin: const Offset(0.7, 0.7), curve: Curves.easeOutBack),
+                            .scale(begin: const Offset(0.6, 0.6), curve: Curves.easeOutBack),
 
                         const SizedBox(height: 16),
 
@@ -478,56 +492,87 @@ class _CongoMapBgPainter extends CustomPainter {
     }
     path.close();
 
-    // Remplissage — vert Congo transparent
+    // Remplissage — vert Congo (plus visible)
     canvas.drawPath(
       path,
-      Paint()..color = AppColors.congoGreen.withValues(alpha: 0.10),
+      Paint()..color = AppColors.congoGreen.withValues(alpha: 0.22),
     );
 
-    // Contour — or pâle
+    // Double contour pour l'effet cartographique
     canvas.drawPath(
       path,
       Paint()
-        ..color = AppColors.congoYellow.withValues(alpha: 0.18)
+        ..color = AppColors.congoGreen.withValues(alpha: 0.35)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 3.0,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = AppColors.congoYellow.withValues(alpha: 0.50)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
     );
 
-    // Points de villes principales
-    _drawCity(canvas, Offset(0.55 * w, 0.87 * h), 'BZV', AppColors.congoYellow); // Brazzaville
-    _drawCity(canvas, Offset(0.38 * w, 0.30 * h), 'PNR', AppColors.congoRed);   // Pointe-Noire (approx)
-    _drawCity(canvas, Offset(0.55 * w, 0.50 * h), 'OUE', Colors.white38);       // Ouesso (nord)
+    // Points de villes principales (plus grands)
+    _drawCity(canvas, Offset(0.55 * w, 0.87 * h), 'BZV', AppColors.congoYellow, big: true); // Brazzaville (capitale)
+    _drawCity(canvas, Offset(0.16 * w, 0.72 * h), 'PNR', AppColors.congoRed);               // Pointe-Noire (côte)
+    _drawCity(canvas, Offset(0.60 * w, 0.48 * h), 'OUE', Colors.white54);                   // Ouesso (nord)
+    _drawCity(canvas, Offset(0.45 * w, 0.65 * h), 'DOL', AppColors.primary.withValues(alpha: 0.7)); // Dolisie
 
-    // Réseau routier stylisé (route nationale 1)
+    // Réseau routier (route nationale 1) — plus visible
     final roadPath = Path()
       ..moveTo(0.55 * w, 0.87 * h)   // BZV
-      ..cubicTo(0.50 * w, 0.70 * h,
-                0.44 * w, 0.55 * h,
-                0.42 * w, 0.38 * h)
-      ..cubicTo(0.40 * w, 0.28 * h,
-                0.38 * w, 0.22 * h,
-                0.38 * w, 0.30 * h); // PNR (sortie côte)
+      ..cubicTo(0.52 * w, 0.78 * h,
+                0.50 * w, 0.70 * h,
+                0.45 * w, 0.65 * h)  // Dolisie
+      ..cubicTo(0.40 * w, 0.59 * h,
+                0.30 * w, 0.68 * h,
+                0.16 * w, 0.72 * h); // PNR
     canvas.drawPath(roadPath,
-        Paint()..color = AppColors.congoYellow.withValues(alpha: 0.12)
-            ..style = PaintingStyle.stroke..strokeWidth = 1.0
+        Paint()..color = AppColors.congoYellow.withValues(alpha: 0.30)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.8
+            ..strokeCap = StrokeCap.round);
+
+    // Route nord BZV → Ouesso
+    final northRoad = Path()
+      ..moveTo(0.55 * w, 0.87 * h)
+      ..cubicTo(0.58 * w, 0.73 * h,
+                0.60 * w, 0.60 * h,
+                0.60 * w, 0.48 * h);
+    canvas.drawPath(northRoad,
+        Paint()..color = AppColors.congoYellow.withValues(alpha: 0.20)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2
             ..strokeCap = StrokeCap.round);
   }
 
-  void _drawCity(Canvas canvas, Offset pos, String name, Color color) {
-    // Anneau lumineux
-    canvas.drawCircle(pos, 5,
-        Paint()..color = color.withValues(alpha: 0.15));
+  void _drawCity(Canvas canvas, Offset pos, String name, Color color, {bool big = false}) {
+    final ringR  = big ? 9.0 : 6.0;
+    final dotR   = big ? 4.5 : 3.0;
+    final fs     = big ? 10.0 : 8.5;
+    // Halo
+    canvas.drawCircle(pos, ringR * 2,
+        Paint()..color = color.withValues(alpha: 0.10));
+    // Anneau
+    canvas.drawCircle(pos, ringR,
+        Paint()..color = color.withValues(alpha: 0.50)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5);
     // Point central
-    canvas.drawCircle(pos, 2.5,
-        Paint()..color = color.withValues(alpha: 0.7));
+    canvas.drawCircle(pos, dotR,
+        Paint()..color = color.withValues(alpha: 0.90));
 
     final tp = TextPainter(
       text: TextSpan(text: name, style: TextStyle(
-        color: color.withValues(alpha: 0.6), fontSize: 8, fontWeight: FontWeight.w600,
+        color: color.withValues(alpha: 0.85),
+        fontSize: fs,
+        fontWeight: FontWeight.w700,
       )),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(canvas, Offset(pos.dx + 7, pos.dy - tp.height / 2));
+    tp.paint(canvas, Offset(pos.dx + ringR + 3, pos.dy - tp.height / 2));
   }
 
   @override

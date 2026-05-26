@@ -54,7 +54,10 @@ export const userPublicSchema = z.object({
 export const registerBodySchema = z.object({
   name:      z.string().min(2).max(80),
   email:     z.string().email(),
-  telephone: z.string().min(8).max(20),
+  telephone: z.preprocess(
+    (v) => (v === '' || v === null ? undefined : v),
+    z.string().min(8).max(20).optional(),
+  ),
   pin:       PASSWORD_POLICY,
 });
 export type RegisterBody = z.infer<typeof registerBodySchema>;

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 /// Theme-aware color accessor. Usage: `context.col.bg`
 extension AppColorsContext on BuildContext {
-  _AdaptiveColors get col => _AdaptiveColors(this);
+  AdaptiveColors get col => AdaptiveColors(this);
 }
 
-class _AdaptiveColors {
+class AdaptiveColors {
   final BuildContext _ctx;
-  const _AdaptiveColors(this._ctx);
+  const AdaptiveColors(this._ctx);
 
   bool get _dark => Theme.of(_ctx).brightness == Brightness.dark;
 

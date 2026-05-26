@@ -200,12 +200,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ['Auth'],
         summary: 'Demande de réinitialisation de mot de passe',
-        description: 'PUBLIC. Toujours 200 (anti-enumeration). Un email est envoyé si le compte existe.',
-        body: z.object({ email: z.string().email() }),
+        description: 'PUBLIC. Toujours 200 (anti-enumeration). Email ou téléphone acceptés. Un email est envoyé si le compte existe.',
+        body: z.object({
+          email: z.string().optional(),
+          telephone: z.string().optional(),
+          identifier: z.string().optional(),
+        }),
       },
     },
     async (request) => {
-      await forgotPassword(request.body.email);
+      const id = request.body.identifier ?? request.body.email ?? request.body.telephone ?? '';
+      await forgotPassword(id);
       return ok({ sent: true });
     },
   );

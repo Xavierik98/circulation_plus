@@ -554,17 +554,29 @@ function resetKey(token: string): string {
   return `reset:${token}`;
 }
 
-// Étape 1 : génère un token de réinitialisation, envoie l'email.
-// Anti-enumeration : retourne toujours succès même si l'email n'existe pas.
-export async function forgotPassword(email: string): Promise<void> {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || !user.actif) return; // silencieux
+// Étape 1 : génère un token de réinitialisation, envoie l'email ou SMS.
+// Anti-enumeration : retourne toujours succès même si l'identifiant n'existe pas.
+// identifier = email ou numéro de téléphone.
+export async function forgotPassword(identifier: string): Promise<void> {
+  const clean = identifier.toLowerCase().trim();
+  const isPhone = /^[+\d\s()-]{7,}$/.test(clean) && !clean.includes('@');
+
+  let user = null;
+  if (isPhone) {
+    // Recherche par téléphone (findFirst car telephone n'est pas unique)
+    user = await prisma.user.findFirst({
+      where: { telephone: { contains: clean.replace(/\s/g, '') }, actif: true },
+    });
+  } else {
+    user = await prisma.user.findUnique({ where: { email: clean } });
+  }
+  if (!user || !user.actif) return; // silencieux — anti-enumeration
 
   const token = randomUUID();
   await redis.set(resetKey(token), user.id, 'EX', RESET_TTL_SECONDS);
 
   try {
-    await sendPasswordResetEmail(email, user.name, token);
+    await sendPasswordResetEmail(user.email, user.name, token);
   } catch {
     // Email non bloquant — le token est déjà en Redis
   }

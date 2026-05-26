@@ -221,7 +221,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 18),
 
                     // Email
-                    _label('Email'),
+                    _label('Adresse email *'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _emailController,
@@ -235,9 +235,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             color: AppColors.congoGreen, size: 20),
                       ),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Email requis';
+                        if (v == null || v.trim().isEmpty) return 'Email requis *';
                         if (!v.contains('@') || !v.contains('.')) {
-                          return 'Email invalide';
+                          return 'Format email invalide';
                         }
                         return null;
                       },
@@ -245,8 +245,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     const SizedBox(height: 18),
 
-                    // Téléphone
+                    // Téléphone (optionnel)
                     _label('Numéro de téléphone'),
+                    const SizedBox(height: 4),
+                    Text('Optionnel — utile pour les notifications SMS',
+                        style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textTertiary, fontSize: 10)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _phoneController,
@@ -254,20 +258,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       style: AppTextStyles.bodyMedium
                           .copyWith(color: AppColors.textPrimary),
                       decoration: const InputDecoration(
-                        hintText: '+242 06 000 0000',
+                        hintText: '+242 06 000 0000  (optionnel)',
                         prefixIcon: Icon(Icons.phone_rounded,
                             color: AppColors.congoGreen, size: 20),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().length < 8)
-                              ? 'Numéro invalide'
-                              : null,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null; // optionnel
+                        if (v.trim().length < 8) return 'Numéro trop court';
+                        return null;
+                      },
                     ).animate().fadeIn(delay: 400.ms),
 
                     const SizedBox(height: 18),
 
                     // Mot de passe
-                    _label('Mot de passe'),
+                    _label('Mot de passe *'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _pinController,
@@ -299,7 +304,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 18),
 
                     // Confirmer mot de passe
-                    _label('Confirmer le mot de passe'),
+                    _label('Confirmer le mot de passe *'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _confirmPinController,
@@ -400,10 +405,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Widget _label(String text) => Text(
-    text,
-    style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary),
-  );
+  Widget _label(String text) {
+    final hasAsterisk = text.endsWith('*');
+    final base = hasAsterisk ? text.substring(0, text.length - 1) : text;
+    if (!hasAsterisk) {
+      return Text(base,
+          style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary));
+    }
+    return RichText(
+      text: TextSpan(
+        style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary),
+        children: [
+          TextSpan(text: base),
+          const TextSpan(text: '*', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
 }
 
 class _RegisterBgPainter extends CustomPainter {

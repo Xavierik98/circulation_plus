@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join, normalize } from 'node:path';
+import { join, normalize, extname } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { StubStorageProvider } from '../../adapters/storage/stub.storage';
 import { confirmPayment } from './payments.service';
@@ -15,7 +15,20 @@ export function registerStubRoutes(app: FastifyInstance): void {
       const filePath = join(StubStorageProvider.DIR, safe);
       try {
         const bytes = await readFile(filePath);
-        reply.header('Content-Type', 'application/pdf');
+        // Détecter le Content-Type selon l'extension (images + PDF)
+        const ext = extname(filePath).toLowerCase();
+        const mimeMap: Record<string, string> = {
+          '.jpg':  'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png':  'image/png',
+          '.webp': 'image/webp',
+          '.gif':  'image/gif',
+          '.pdf':  'application/pdf',
+        };
+        const ct = mimeMap[ext] ?? 'application/octet-stream';
+        reply.header('Content-Type', ct);
+        reply.header('Cache-Control', 'public, max-age=3600');
+        reply.header('Access-Control-Allow-Origin', '*');
         return reply.send(bytes);
       } catch {
         return reply.status(404).send({ success: false, error: 'Fichier introuvable', code: 'NOT_FOUND' });

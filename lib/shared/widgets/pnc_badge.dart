@@ -68,6 +68,9 @@ class PncArmoiriePainter extends CustomPainter {
     // ── Bandes tricolores Congo (3 arcs en bas) ───────────────────────────
     _drawCongoArcs(canvas, Offset(cx, cy), r * 0.74);
 
+    // ── Flamme/Torche au sommet (emblème PNC) ────────────────────────────
+    _drawFlame(canvas, Offset(cx, cy - r * 0.62), r * 0.14);
+
     // ── 5 étoiles or en arc au-dessus du bouclier ─────────────────────────
     final starPaint = Paint()..color = AppColors.congoYellow;
     for (int i = 0; i < 5; i++) {
@@ -76,15 +79,18 @@ class PncArmoiriePainter extends CustomPainter {
         cx + (r * 0.55) * math.cos(angle),
         cy + (r * 0.55) * math.sin(angle) - r * 0.05,
       );
-      _drawStar(canvas, sc, r * 0.10, starPaint);  // 6px @ 120 — visible !
+      _drawStar(canvas, sc, r * 0.10, starPaint);
     }
-
-    // ── Bouclier central ──────────────────────────────────────────────────
-    _drawShield(canvas, Offset(cx, cy + r * 0.06), r * 0.40);
 
     // ── Lauriers de chaque côté ───────────────────────────────────────────
     _drawLaurel(canvas, Offset(cx, cy + r * 0.06), r * 0.72, isLeft: true);
     _drawLaurel(canvas, Offset(cx, cy + r * 0.06), r * 0.72, isLeft: false);
+
+    // ── Bouclier central ──────────────────────────────────────────────────
+    _drawShield(canvas, Offset(cx, cy + r * 0.06), r * 0.40);
+
+    // ── Ruban/devise en bas ───────────────────────────────────────────────
+    _drawRibbon(canvas, Offset(cx, cy + r * 0.78), r * 0.55);
   }
 
   // ─── Arcs tricolores Congo ─────────────────────────────────────────────────
@@ -226,6 +232,83 @@ class PncArmoiriePainter extends CustomPainter {
           ..color = AppColors.gold.withValues(alpha: 0.4)
           ..style = PaintingStyle.stroke
           ..strokeWidth = r * 0.15);
+  }
+
+  // ─── Flamme / Torche au sommet ───────────────────────────────────────────
+  void _drawFlame(Canvas canvas, Offset c, double r) {
+    // Corps de la torche (rectangle arrondi)
+    final torchPaint = Paint()..color = AppColors.gold;
+    final torchRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(c.dx, c.dy + r * 1.4), width: r * 0.45, height: r * 1.0),
+      Radius.circular(r * 0.1),
+    );
+    canvas.drawRRect(torchRect, torchPaint);
+
+    // Flamme principale (orange/rouge)
+    final flamePath = Path()
+      ..moveTo(c.dx, c.dy - r)               // pointe haute
+      ..cubicTo(c.dx + r * 0.9, c.dy - r * 0.2,
+                c.dx + r * 0.7, c.dy + r * 0.5,
+                c.dx, c.dy + r * 0.85)       // base droite
+      ..cubicTo(c.dx - r * 0.7, c.dy + r * 0.5,
+                c.dx - r * 0.9, c.dy - r * 0.2,
+                c.dx, c.dy - r)
+      ..close();
+    canvas.drawPath(flamePath,
+        Paint()
+          ..shader = LinearGradient(
+            colors: [AppColors.congoRed, AppColors.congoYellow, AppColors.congoRed],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ).createShader(Rect.fromCenter(center: c, width: r * 2, height: r * 2)));
+
+    // Lueur flamme
+    canvas.drawPath(flamePath,
+        Paint()
+          ..color = AppColors.congoYellow.withValues(alpha: 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.15);
+  }
+
+  // ─── Ruban devise en bas du bouclier ─────────────────────────────────────
+  void _drawRibbon(Canvas canvas, Offset c, double halfW) {
+    final rH = halfW * 0.22;
+    // Corps du ruban
+    final ribbonPath = Path()
+      ..moveTo(c.dx - halfW, c.dy - rH * 0.5)
+      ..lineTo(c.dx + halfW, c.dy - rH * 0.5)
+      ..lineTo(c.dx + halfW, c.dy + rH * 0.5)
+      ..lineTo(c.dx, c.dy + rH)
+      ..lineTo(c.dx - halfW, c.dy + rH * 0.5)
+      ..close();
+    canvas.drawPath(ribbonPath,
+        Paint()
+          ..shader = LinearGradient(
+            colors: [AppColors.congoGreen, AppColors.congoGreen.withValues(alpha: 0.7)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ).createShader(Rect.fromCenter(center: c, width: halfW * 2, height: rH * 2)));
+    canvas.drawPath(ribbonPath,
+        Paint()
+          ..color = AppColors.gold.withValues(alpha: 0.6)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = halfW * 0.04);
+
+    // Texte "SERVIR ET PROTÉGER"
+    final fs = (halfW * 0.18).clamp(5.0, 11.0);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: 'SERVIR ET PROTÉGER',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: fs,
+          fontWeight: FontWeight.w800,
+          letterSpacing: fs * 0.08,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: halfW * 1.9);
+    tp.paint(canvas, Offset(c.dx - tp.width / 2, c.dy - tp.height / 2));
   }
 
   // ─── Texte circulaire entre les deux anneaux ──────────────────────────────

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -14,15 +13,33 @@ class RoleSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
     return Scaffold(
-      backgroundColor: AppColors.policeNavy,
+      // Fond vert foncé Congo (pas bleu = pas RDC)
+      backgroundColor: const Color(0xFF051A0A),
       body: Stack(
         children: [
+          // ── Dégradé de fond tricolore Congo (vert → sombre) ─────────────
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF0A2A10), // vert foncé Congo
+                    const Color(0xFF071508),
+                    const Color(0xFF0D1A06),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // ── Carte Congo Brazzaville en fond plein écran ──────────────────
           Positioned.fill(
             child: CustomPaint(painter: _CongoMapBgPainter()),
           ),
 
-          // ── Overlay gradient du bas ──────────────────────────────────────
+          // ── Overlay gradient du bas (moins opaque, laisse le vert passer) ─
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -30,12 +47,12 @@ class RoleSelectionScreen extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.policeNavy.withValues(alpha: 0.15),
-                    AppColors.policeNavy.withValues(alpha: 0.40),
-                    AppColors.policeNavy.withValues(alpha: 0.85),
-                    AppColors.policeNavy,
+                    Colors.transparent,
+                    const Color(0xFF051A0A).withValues(alpha: 0.30),
+                    const Color(0xFF051A0A).withValues(alpha: 0.75),
+                    const Color(0xFF051A0A),
                   ],
-                  stops: const [0.0, 0.30, 0.60, 1.0],
+                  stops: const [0.0, 0.35, 0.65, 1.0],
                 ),
               ),
             ),
@@ -492,33 +509,42 @@ class _CongoMapBgPainter extends CustomPainter {
     }
     path.close();
 
-    // Remplissage — vert Congo (plus visible)
+    // Remplissage — vert Congo bien visible (République du Congo = vert)
     canvas.drawPath(
       path,
-      Paint()..color = AppColors.congoGreen.withValues(alpha: 0.22),
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            AppColors.congoGreen.withValues(alpha: 0.45),
+            AppColors.congoGreen.withValues(alpha: 0.25),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(Rect.fromLTWH(0, 0, w, h)),
     );
 
-    // Double contour pour l'effet cartographique
+    // Contour principal vert vif
     canvas.drawPath(
       path,
       Paint()
-        ..color = AppColors.congoGreen.withValues(alpha: 0.35)
+        ..color = AppColors.congoGreen.withValues(alpha: 0.80)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.0,
+        ..strokeWidth = 2.5,
     );
+    // Contour secondaire or (frontière)
     canvas.drawPath(
       path,
       Paint()
-        ..color = AppColors.congoYellow.withValues(alpha: 0.50)
+        ..color = AppColors.congoYellow.withValues(alpha: 0.60)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
+        ..strokeWidth = 0.8,
     );
 
     // Points de villes principales (plus grands)
     _drawCity(canvas, Offset(0.55 * w, 0.87 * h), 'BZV', AppColors.congoYellow, big: true); // Brazzaville (capitale)
     _drawCity(canvas, Offset(0.16 * w, 0.72 * h), 'PNR', AppColors.congoRed);               // Pointe-Noire (côte)
     _drawCity(canvas, Offset(0.60 * w, 0.48 * h), 'OUE', Colors.white54);                   // Ouesso (nord)
-    _drawCity(canvas, Offset(0.45 * w, 0.65 * h), 'DOL', AppColors.primary.withValues(alpha: 0.7)); // Dolisie
+    _drawCity(canvas, Offset(0.45 * w, 0.65 * h), 'DOL', AppColors.congoYellow.withValues(alpha: 0.8)); // Dolisie
 
     // Réseau routier (route nationale 1) — plus visible
     final roadPath = Path()

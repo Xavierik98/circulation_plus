@@ -11,7 +11,7 @@ import { createConvocation } from '../convocations/convocations.service';
 import type { CreateFineBody } from './fines.schema';
 
 const FINE_INCLUDE = {
-  officer: { select: { id: true, name: true, badgeNumber: true } },
+  officer: { select: { id: true, name: true, badgeNumber: true, photoUrl: true } },
   citizen: { select: { id: true, name: true } },
   driver: true,
   vehicle: true,

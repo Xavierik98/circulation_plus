@@ -135,13 +135,7 @@ class _FineDetailsBody extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Officer info
-          _buildSection('Agent verbalisateur', [
-            _DetailRow(label: 'Nom', value: fine.officerName),
-            _DetailRow(
-                label: 'Matricule',
-                value: fine.officerBadge,
-                isMono: true),
-          ]),
+          _buildOfficerSection(fine),
 
           const SizedBox(height: 16),
 
@@ -306,6 +300,115 @@ class _FineDetailsBody extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.97, 0.97));
+  }
+
+  Widget _buildOfficerSection(FineModel fine) {
+    return PremiumCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Agent verbalisateur',
+              style: AppTextStyles.titleSmall
+                  .copyWith(color: AppColors.textTertiary)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Avatar photo ou initiales
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.5), width: 2),
+                  color: AppColors.policeNavy,
+                ),
+                child: ClipOval(
+                  child: fine.officerPhotoUrl != null &&
+                          fine.officerPhotoUrl!.isNotEmpty
+                      ? Image.network(
+                          fine.officerPhotoUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _officerInitials(fine.officerName),
+                        )
+                      : _officerInitials(fine.officerName),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(fine.officerName.isEmpty ? '—' : fine.officerName,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.35)),
+                          ),
+                          child: Text(
+                            fine.officerBadge.isEmpty ? '—' : fine.officerBadge,
+                            style: AppTextStyles.mono.copyWith(
+                                fontSize: 11,
+                                color: AppColors.gold,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.policeBlue.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.2)),
+                          ),
+                          child: Text('PNC',
+                              style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 150.ms);
+  }
+
+  Widget _officerInitials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final initials = parts
+        .take(2)
+        .map((p) => p.isNotEmpty ? p[0].toUpperCase() : '')
+        .join();
+    return Container(
+      color: AppColors.policeNavy,
+      child: Center(
+        child: Text(
+          initials.isEmpty ? '?' : initials,
+          style: const TextStyle(
+              color: AppColors.gold,
+              fontSize: 20,
+              fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
   }
 
   Widget _buildSection(String title, List<Widget> rows) {

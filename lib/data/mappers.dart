@@ -45,6 +45,7 @@ FineModel fineFromJson(Map<String, dynamic> j) {
     officerId: j['officerId'] as String? ?? '',
     officerName: officer?['name'] as String? ?? '',
     officerBadge: officer?['badgeNumber'] as String? ?? '',
+    officerPhotoUrl: officer?['photoUrl'] as String?,
     infractionCode: infraction?['code'] as String? ?? '',
     infractionLabel: infraction?['libelle'] as String? ?? '',
     amount: (j['montantTotal'] as num?)?.toInt() ?? 0,

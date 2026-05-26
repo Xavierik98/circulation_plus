@@ -20,7 +20,8 @@ class FineModel {
   final String location;
   final double latitude;
   final double longitude;
-  final String? paymentId;   // UUID du paiement (pour le reçu)
+  final String? officerPhotoUrl;  // Photo de l'agent verbalisateur
+  final String? paymentId;        // UUID du paiement (pour le reçu)
   final String? paymentRef;
   final DateTime? paidAt;
   final String? paymentMethod;
@@ -45,6 +46,7 @@ class FineModel {
     required this.location,
     required this.latitude,
     required this.longitude,
+    this.officerPhotoUrl,
     this.paymentId,
     this.paymentRef,
     this.paidAt,

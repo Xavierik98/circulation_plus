@@ -12,6 +12,7 @@ import '../../../shared/widgets/status_badge.dart';
 import '../../../data/providers.dart';
 import '../../../data/repositories.dart';
 import '../../../data/api_client.dart';
+import 'suspension_history_screen.dart';
 
 class OfficersManagementScreen extends ConsumerStatefulWidget {
   const OfficersManagementScreen({super.key});
@@ -41,6 +42,13 @@ class _OfficersManagementScreenState
         backgroundColor: AppColors.surface,
         title: Text('Gestion des agents', style: AppTextStyles.titleMedium),
         actions: [
+          IconButton(
+            tooltip: 'Historique des suspensions',
+            icon: const Icon(Icons.history_rounded, color: AppColors.warning),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SuspensionHistoryScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Ajouter un agent',
             icon: const Icon(Icons.person_add_rounded, color: AppColors.primary),
@@ -314,7 +322,7 @@ class _OfficersManagementScreenState
   }
 }
 
-class _OfficerCard extends StatelessWidget {
+class _OfficerCard extends ConsumerWidget {
   final OfficerModel officer;
   const _OfficerCard({required this.officer});
 
@@ -327,9 +335,9 @@ class _OfficerCard extends StatelessWidget {
     );
   }
 
-  void _showSanctionSheet(BuildContext context) {
-    String? selectedType;
+  void _showSuspendSheet(BuildContext context, WidgetRef ref) {
     final motifCtrl = TextEditingController();
+    final durationCtrl = TextEditingController();
     bool loading = false;
 
     showModalBottomSheet(
@@ -344,155 +352,135 @@ class _OfficerCard extends StatelessWidget {
               color: AppColors.surface,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: AppColors.cardBorder, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
                 Row(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.block_rounded, color: AppColors.error, size: 20),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text('Sanctionner ${officer.fullName}',
-                          style: AppTextStyles.titleSmall),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Suspendre l\'agent', style: AppTextStyles.titleSmall),
+                          Text(officer.fullName,
+                              style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: AppColors.textSecondary, size: 20),
+                      icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 20),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedType,
-                  dropdownColor: AppColors.surface,
-                  decoration: InputDecoration(
-                    labelText: 'Type de sanction',
-                    labelStyle: AppTextStyles.bodySmall,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    isDense: true,
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'AVERTISSEMENT',
-                      child: Text('Avertissement'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'BLAME',
-                      child: Text('Blâme'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'SUSPENSION_TEMPORAIRE',
-                      child: Text('Suspension temporaire'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'REVOCATION',
-                      child: Text('Révocation'),
-                    ),
-                  ],
-                  onChanged: (v) => setLocal(() => selectedType = v),
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: motifCtrl,
                   maxLines: 3,
-                  style: AppTextStyles.bodyMedium
-                      .copyWith(color: AppColors.textPrimary),
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
                   decoration: InputDecoration(
-                    labelText: 'Motif (obligatoire)',
+                    labelText: 'Motif de suspension *',
                     labelStyle: AppTextStyles.bodySmall,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                    hintText: 'Minimum 10 caractères...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     isDense: true,
+                    prefixIcon: const Icon(Icons.gavel_rounded, size: 18),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: durationCtrl,
+                  keyboardType: TextInputType.number,
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Durée (jours) — optionnel',
+                    labelStyle: AppTextStyles.bodySmall,
+                    hintText: 'Laisser vide = durée indéterminée',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.timelapse_rounded, size: 18),
                   ),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: loading
-                        ? null
-                        : () async {
-                            if (selectedType == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Sélectionnez un type de sanction'),
-                                  backgroundColor: AppColors.error,
-                                ),
-                              );
-                              return;
-                            }
-                            if (motifCtrl.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Le motif est obligatoire'),
-                                  backgroundColor: AppColors.error,
-                                ),
-                              );
-                              return;
-                            }
-                            setLocal(() => loading = true);
-                            try {
-                              await ApiClient.instance.post(
-                                '/api/officers/${officer.id}/sanctions',
-                                body: {
-                                  'type': selectedType,
-                                  'motif': motifCtrl.text.trim(),
-                                },
-                              );
-                              if (ctx.mounted) {
-                                Navigator.of(ctx).pop();
-                              }
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        'Sanction appliquée à ${officer.fullName}'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
-                              }
-                            } on ApiException catch (e) {
-                              setLocal(() => loading = false);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(e.message),
-                                    backgroundColor: AppColors.error,
-                                  ),
-                                );
-                              }
-                            } catch (_) {
-                              setLocal(() => loading = false);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Erreur lors de l\'application de la sanction.'),
-                                    backgroundColor: AppColors.error,
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    icon: loading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.block_rounded, size: 18),
+                    label: Text(loading ? 'Suspension...' : 'Confirmer la suspension',
+                        style: AppTextStyles.labelMedium.copyWith(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.error,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : Text('Appliquer la sanction',
-                            style: AppTextStyles.labelMedium
-                                .copyWith(color: Colors.white)),
+                    onPressed: loading ? null : () async {
+                      final motif = motifCtrl.text.trim();
+                      if (motif.length < 10) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Le motif doit faire au moins 10 caractères'), backgroundColor: AppColors.error),
+                        );
+                        return;
+                      }
+                      setLocal(() => loading = true);
+                      try {
+                        final durDays = int.tryParse(durationCtrl.text.trim());
+                        await ApiClient.instance.patch(
+                          '/api/officers/${officer.id}/suspend',
+                          body: {
+                            'motif': motif,
+                            if (durDays != null) 'durationDays': durDays,
+                          },
+                        );
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${officer.fullName} a été suspendu(e).'),
+                              backgroundColor: AppColors.warning,
+                            ),
+                          );
+                        }
+                        ref.invalidate(officersProvider(''));
+                      } on ApiException catch (e) {
+                        setLocal(() => loading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.message), backgroundColor: AppColors.error),
+                          );
+                        }
+                      } catch (_) {
+                        setLocal(() => loading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Erreur réseau. Réessayez.'), backgroundColor: AppColors.error),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
-                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -501,8 +489,44 @@ class _OfficerCard extends StatelessWidget {
     );
   }
 
+  Future<void> _activateOfficer(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Réactiver l\'agent', style: AppTextStyles.titleSmall),
+        content: Text('Confirmez-vous la réactivation de ${officer.fullName} ?',
+            style: AppTextStyles.bodyMedium),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+            child: const Text('Réactiver', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    try {
+      await ApiClient.instance.patch('/api/officers/${officer.id}/activate', body: {});
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${officer.fullName} a été réactivé(e).'), backgroundColor: AppColors.success),
+        );
+      }
+      ref.invalidate(officersProvider(''));
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return PremiumCard(
       child: Column(
         children: [
@@ -563,24 +587,33 @@ class _OfficerCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () => _showSanctionSheet(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: AppColors.error.withValues(alpha: 0.3)),
+                  // Suspend / Activate button
+                  if (officer.status != OfficerStatus.active)
+                    GestureDetector(
+                      onTap: () => _activateOfficer(context, ref),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                        ),
+                        child: Text('Réactiver', style: AppTextStyles.caption.copyWith(color: AppColors.success)),
                       ),
-                      child: Text(
-                        'Sanctionner',
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.error),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: () => _showSuspendSheet(context, ref),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Text('Suspendre', style: AppTextStyles.caption.copyWith(color: AppColors.error)),
                       ),
                     ),
-                  ),
                 ],
               ),
             ],

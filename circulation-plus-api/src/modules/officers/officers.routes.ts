@@ -11,7 +11,7 @@ import {
   officerIdParamsSchema,
   importCsvSchema,
 } from './officers.schema';
-import { listOfficers, createOfficer, updateOfficer, importOfficersFromCsv, getOfficerActivity } from './officers.service';
+import { listOfficers, createOfficer, updateOfficer, importOfficersFromCsv, getOfficerActivity, suspendOfficer, activateOfficer, listSuspensionHistory } from './officers.service';
 
 // Module Officers — réservé au rôle ADMIN.
 export async function officersRoutes(app: FastifyInstance): Promise<void> {
@@ -103,6 +103,74 @@ export async function officersRoutes(app: FastifyInstance): Promise<void> {
       const { id } = request.params;
       const { page, limit } = request.query;
       return ok(await getOfficerActivity(id, page, limit, request.user!));
+    },
+  );
+
+  // GET /api/officers/suspensions — historique des suspensions/réactivations
+  r.get(
+    '/suspensions',
+    {
+      preHandler: [authenticate, authorize('ADMIN')],
+      schema: {
+        tags: ['Agents'],
+        summary: 'Historique des suspensions et réactivations',
+        description: 'Rôles autorisés : ADMIN. Filtre automatiquement selon la portée hiérarchique.',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({
+          page:  z.coerce.number().int().positive().default(1),
+          limit: z.coerce.number().int().positive().max(100).default(50),
+        }),
+      },
+    },
+    async (request) => {
+      const { page, limit } = request.query;
+      return ok(await listSuspensionHistory(request.user!, page, limit));
+    },
+  );
+
+  // PATCH /api/officers/:id/suspend — suspension d'un agent
+  r.patch(
+    '/:id/suspend',
+    {
+      preHandler: [authenticate, authorize('ADMIN')],
+      schema: {
+        tags: ['Agents'],
+        summary: 'Suspendre un agent',
+        description: 'Rôles autorisés : ADMIN. Vérifie la portée hiérarchique. Révoque tous les refresh tokens.',
+        security: [{ bearerAuth: [] }],
+        params: officerIdParamsSchema,
+        body: z.object({
+          motif:       z.string().min(10, 'Le motif doit faire au moins 10 caractères'),
+          durationDays: z.number().int().positive().optional(),
+        }),
+      },
+    },
+    async (request) => {
+      const { id } = request.params;
+      const { motif, durationDays } = request.body;
+      await suspendOfficer(id, motif, request.user!.id, request.user!, durationDays);
+      return ok({ suspended: true });
+    },
+  );
+
+  // PATCH /api/officers/:id/activate — réactivation d'un agent
+  r.patch(
+    '/:id/activate',
+    {
+      preHandler: [authenticate, authorize('ADMIN')],
+      schema: {
+        tags: ['Agents'],
+        summary: 'Réactiver un agent suspendu',
+        description: 'Rôles autorisés : ADMIN. Vérifie la portée hiérarchique.',
+        security: [{ bearerAuth: [] }],
+        params: officerIdParamsSchema,
+        body: z.object({}).optional(),
+      },
+    },
+    async (request) => {
+      const { id } = request.params;
+      await activateOfficer(id, request.user!.id, request.user!);
+      return ok({ activated: true });
     },
   );
 

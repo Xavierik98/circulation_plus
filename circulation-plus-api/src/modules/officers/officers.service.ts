@@ -408,6 +408,169 @@ export async function getOfficerActivity(
   return { items, total };
 }
 
+// ── Suspension d'un agent ────────────────────────────────────────────────
+export async function suspendOfficer(
+  id: string,
+  motif: string,
+  actorId: string,
+  admin: AuthUser,
+  durationDays?: number,
+): Promise<void> {
+  const officer = await prisma.user.findUnique({ where: { id } });
+  if (!officer || officer.role !== 'POLICE') {
+    throw AppError.notFound('Agent introuvable', 'OFFICER_NOT_FOUND');
+  }
+  if (!officer.actif) {
+    throw AppError.badRequest('Cet agent est déjà suspendu', 'ALREADY_SUSPENDED');
+  }
+
+  // Vérification de portée hiérarchique
+  const hFilter = await buildHierarchyFilter(admin);
+  const cIdFilter = (hFilter as Prisma.UserWhereInput).commissariatId;
+  const dIdFilter = (hFilter as Prisma.UserWhereInput).departementId;
+
+  if (cIdFilter) {
+    const inScope =
+      typeof cIdFilter === 'string'
+        ? officer.commissariatId === cIdFilter
+        : typeof cIdFilter === 'object' && 'in' in cIdFilter
+          ? (cIdFilter.in as string[]).includes(officer.commissariatId ?? '')
+          : true;
+    if (!inScope) throw AppError.forbidden("Cet agent n'est pas dans votre périmètre", 'FORBIDDEN');
+  } else if (dIdFilter && typeof dIdFilter === 'string') {
+    if (officer.departementId !== dIdFilter)
+      throw AppError.forbidden("Cet agent n'est pas dans votre département", 'FORBIDDEN');
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data: { actif: false },
+  });
+
+  await revokeAllRefreshTokens(id);
+
+  await audit(prisma, {
+    userId: actorId,
+    action: 'OFFICER_SUSPENDED',
+    details: {
+      officerId: id,
+      officerName: officer.name,
+      badgeNumber: officer.badgeNumber,
+      motif,
+      durationDays: durationDays ?? null,
+      suspendedAt: new Date().toISOString(),
+    },
+  });
+}
+
+// ── Réactivation d'un agent ──────────────────────────────────────────────
+export async function activateOfficer(
+  id: string,
+  actorId: string,
+  admin: AuthUser,
+): Promise<void> {
+  const officer = await prisma.user.findUnique({ where: { id } });
+  if (!officer || officer.role !== 'POLICE') {
+    throw AppError.notFound('Agent introuvable', 'OFFICER_NOT_FOUND');
+  }
+  if (officer.actif) {
+    throw AppError.badRequest('Cet agent est déjà actif', 'ALREADY_ACTIVE');
+  }
+
+  const hFilter = await buildHierarchyFilter(admin);
+  const cIdFilter = (hFilter as Prisma.UserWhereInput).commissariatId;
+  const dIdFilter = (hFilter as Prisma.UserWhereInput).departementId;
+
+  if (cIdFilter) {
+    const inScope =
+      typeof cIdFilter === 'string'
+        ? officer.commissariatId === cIdFilter
+        : typeof cIdFilter === 'object' && 'in' in cIdFilter
+          ? (cIdFilter.in as string[]).includes(officer.commissariatId ?? '')
+          : true;
+    if (!inScope) throw AppError.forbidden("Cet agent n'est pas dans votre périmètre", 'FORBIDDEN');
+  } else if (dIdFilter && typeof dIdFilter === 'string') {
+    if (officer.departementId !== dIdFilter)
+      throw AppError.forbidden("Cet agent n'est pas dans votre département", 'FORBIDDEN');
+  }
+
+  await prisma.user.update({ where: { id }, data: { actif: true } });
+
+  await audit(prisma, {
+    userId: actorId,
+    action: 'OFFICER_ACTIVATED',
+    details: {
+      officerId: id,
+      officerName: officer.name,
+      badgeNumber: officer.badgeNumber,
+      activatedAt: new Date().toISOString(),
+    },
+  });
+}
+
+// ── Historique des suspensions (audit log) ───────────────────────────────
+export async function listSuspensionHistory(
+  admin: AuthUser,
+  page = 1,
+  limit = 50,
+): Promise<{
+  items: {
+    action: string;
+    officerId: string;
+    officerName: string;
+    badgeNumber: string | null;
+    motif: string | null;
+    durationDays: number | null;
+    actorId: string | null;
+    createdAt: Date;
+  }[];
+  total: number;
+}> {
+  const hierarchyFilter = await buildHierarchyFilter(admin);
+  // Récupérer les IDs d'agents dans la portée
+  const scopedOfficers = await prisma.user.findMany({
+    where: { role: 'POLICE', ...hierarchyFilter },
+    select: { id: true },
+  });
+  const scopedIds = scopedOfficers.map((o) => o.id);
+
+  const where: Prisma.AuditLogWhereInput = {
+    action: { in: ['OFFICER_SUSPENDED', 'OFFICER_ACTIVATED'] },
+    ...(scopedIds.length > 0 ? {
+      OR: [
+        { userId: { in: scopedIds } },
+        // details.officerId might match too
+      ],
+    } : {}),
+  };
+
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+
+  const items = logs.map((log) => {
+    const d = (log.details as Record<string, unknown> | null) ?? {};
+    return {
+      action:      log.action,
+      officerId:   (d['officerId'] as string | null) ?? log.userId ?? '',
+      officerName: (d['officerName'] as string | null) ?? '—',
+      badgeNumber: (d['badgeNumber'] as string | null) ?? null,
+      motif:       (d['motif'] as string | null) ?? null,
+      durationDays:(typeof d['durationDays'] === 'number' ? d['durationDays'] : null),
+      actorId:     log.userId,
+      createdAt:   log.createdAt,
+    };
+  });
+
+  return { items, total };
+}
+
 // ── Modification d'un agent ───────────────────────────────────────────────
 export async function updateOfficer(
   id: string,

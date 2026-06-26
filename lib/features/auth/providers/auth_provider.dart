@@ -336,19 +336,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       _pushFcmToken();
       return devUrl; // '' = auto-vérifié (dev) ou SMTP ok, non-vide = lien direct stub
     } on ApiException catch (e) {
-      if (e.code == 'NETWORK_ERROR') {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'Backend injoignable — impossible de créer un compte en mode démo.',
-        );
-        return null;
-      }
+      // ignore: avoid_print
+      print('[REGISTER ERROR] code=${e.code} status=${e.statusCode} msg=${e.message}');
       state = state.copyWith(isLoading: false, error: e.message);
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[REGISTER CATCH] $e\n$st');
       state = state.copyWith(
         isLoading: false,
-        error: 'Erreur lors de la création du compte.',
+        error: e.toString(),
       );
       return null;
     }

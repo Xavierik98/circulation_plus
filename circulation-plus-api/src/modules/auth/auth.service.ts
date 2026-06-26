@@ -314,7 +314,7 @@ export async function revokeAllRefreshTokens(userId: string): Promise<void> {
 export async function register(
   name: string,
   email: string,
-  telephone: string,
+  telephone: string | undefined,
   pin: string,
   ip: string | null,
   userAgent?: string | null,

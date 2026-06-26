@@ -214,6 +214,35 @@ class FineRepository {
         await _api.get('/api/fines/$fineId/pdf') as Map<String, dynamic>;
     return data['url'] as String;
   }
+
+  Future<Page<FineModel>> listAdmin({
+    String? status,
+    String? dateFrom,
+    String? dateTo,
+    int page = 1,
+    int limit = 25,
+  }) async {
+    final data = await _api.get('/api/fines', query: {
+      if (status != null) 'status': status,
+      if (dateFrom != null) 'dateFrom': dateFrom,
+      if (dateTo != null) 'dateTo': dateTo,
+      'page': page,
+      'limit': limit,
+    }) as Map<String, dynamic>;
+    final items = (data['data'] as List<dynamic>)
+        .map((e) => fineFromJson(e as Map<String, dynamic>))
+        .toList();
+    return Page(
+      items,
+      (data['total'] as num).toInt(),
+      (data['page'] as num).toInt(),
+      (data['limit'] as num).toInt(),
+    );
+  }
+
+  Future<void> updateStatus(String fineId, String status) async {
+    await _api.patch('/api/fines/$fineId/status', body: {'status': status});
+  }
 }
 
 class OfficerRepository {

@@ -126,6 +126,47 @@ final unreadNotificationsCountProvider =
 final selectedInfractionsProvider =
     StateProvider<List<InfractionType>>((ref) => []);
 
+// ── Gestion des amendes (admin) ──────────────────────────────────────────────
+
+class AdminFinesParams {
+  final String? status;
+  final String? dateFrom;
+  final String? dateTo;
+  final int page;
+  final int limit;
+
+  const AdminFinesParams({
+    this.status,
+    this.dateFrom,
+    this.dateTo,
+    this.page = 1,
+    this.limit = 25,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdminFinesParams &&
+      other.status == status &&
+      other.dateFrom == dateFrom &&
+      other.dateTo == dateTo &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(status, dateFrom, dateTo, page, limit);
+}
+
+final adminFinesProvider = FutureProvider.autoDispose
+    .family<Page<FineModel>, AdminFinesParams>((ref, params) {
+  return ref.read(fineRepositoryProvider).listAdmin(
+    status: params.status,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+    page: params.page,
+    limit: params.limit,
+  );
+});
+
 // ── Gestion des utilisateurs (admin) ─────────────────────────────────────────
 
 class UsersParams {

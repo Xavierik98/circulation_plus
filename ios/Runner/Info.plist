@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>L'application a besoin d'accéder à la caméra pour numériser les pièces d'identité (permis de conduire, carte grise).</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>L'application a besoin du microphone pour la capture vidéo (requis par le module caméra).</string>
 </dict>
 </plist>

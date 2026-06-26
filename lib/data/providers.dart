@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/models/fine_model.dart';
 import '../shared/models/officer_model.dart';
 import '../shared/models/notification_model.dart';
 import '../shared/models/infraction_model.dart';
 import 'repositories.dart';
+import 'offline_cache.dart';
+import 'sync_service.dart';
 
 // Repository singletons (ajouts)
 final paymentRepositoryProvider = Provider((_) => PaymentRepository());
@@ -18,10 +21,35 @@ final notificationRepositoryProvider =
 final driverRepositoryProvider = Provider((_) => DriverRepository());
 final statsRepositoryProvider = Provider((_) => StatsRepository());
 
-/// Catalogue public des infractions (utilisé dans le flux de verbalisation).
+/// Catalogue public des infractions — avec fallback hors-ligne.
+/// 1. Tente de charger depuis l'API.
+/// 2. En cas de succès, met en cache localement.
+/// 3. En cas d'échec réseau, charge depuis le cache local.
 final infractionsProvider =
-    FutureProvider.autoDispose<List<InfractionType>>((ref) {
-  return ref.read(infractionRepositoryProvider).list();
+    FutureProvider.autoDispose<List<InfractionType>>((ref) async {
+  final cache = OfflineCache.instance;
+  try {
+    final infractions = await ref.read(infractionRepositoryProvider).list();
+    // Succès réseau → mettre en cache pour usage hors-ligne
+    await cache.cacheInfractions(infractions);
+    return infractions;
+  } catch (e) {
+    // Échec réseau → tenter le cache local
+    debugPrint('[OfflineMode] API indisponible, chargement du cache local...');
+    final cached = await cache.getCachedInfractions();
+    if (cached != null && cached.isNotEmpty) {
+      debugPrint('[OfflineMode] ✓ ${cached.length} infractions depuis le cache');
+      return cached;
+    }
+    rethrow; // Pas de cache → on remonte l'erreur
+  }
+});
+
+/// Nombre de PV en attente de synchronisation (badge UI).
+final pendingFinesCountProvider = StreamProvider<int>((ref) {
+  return Stream.periodic(const Duration(seconds: 5), (_) {
+    return SyncService.instance.pendingCount.value;
+  });
 });
 
 /// Contraventions de l'utilisateur courant (RLS appliquée côté serveur).

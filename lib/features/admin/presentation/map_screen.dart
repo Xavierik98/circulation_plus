@@ -150,11 +150,11 @@ class _MapScreenState extends ConsumerState<MapScreen>
               onTap: (_, __) => setState(() => _selectedOfficer = null),
             ),
             children: [
-              // Tuiles OSM
+              // Fond de carte professionnel Dark Mode (CartoDB Dark Matter)
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'cg.gouv.circulation_plus',
-                tileBuilder: _darkTileBuilder,
               ),
 
               // Heatmap view — cercles colorés par intensité
@@ -307,22 +307,6 @@ class _MapScreenState extends ConsumerState<MapScreen>
           );
         }).toList(),
       ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Tile builder sombre (conserve lisibilité sur fond dark)
-  // ─────────────────────────────────────────────────────────────────────────
-  Widget _darkTileBuilder(
-      BuildContext context, Widget tileWidget, TileImage tile) {
-    return ColorFiltered(
-      colorFilter: const ColorFilter.matrix([
-        0.3, 0.3, 0.3, 0, 0,  // R
-        0.3, 0.3, 0.3, 0, 0,  // G
-        0.35, 0.35, 0.35, 0, 0, // B – légère teinte bleue
-        0, 0, 0, 1, 0,
-      ]),
-      child: tileWidget,
     );
   }
 

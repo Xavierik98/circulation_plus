@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
+import 'data/sync_service.dart';
 
 /// Handler des messages Firebase reçus en arrière-plan.
 /// Doit être une fonction top-level (pas une méthode de classe).
@@ -30,6 +31,11 @@ void main() async {
       debugPrint('[FCM] Firebase non initialisé : $e');
     }
   }
+
+  // ── Sync hors-ligne ────────────────────────────────────────────────────────
+  // Démarre le service de synchronisation : les PV créés sans internet
+  // seront envoyés automatiquement dès le retour du réseau.
+  SyncService.instance.init();
 
   // ── Orientation & style système ───────────────────────────────────────────
   SystemChrome.setPreferredOrientations([

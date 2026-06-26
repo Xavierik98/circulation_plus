@@ -12,6 +12,8 @@ import '../../../../data/providers.dart';
 import '../../../../data/repositories.dart';
 import '../../../../data/api_client.dart';
 import '../../../auth/providers/auth_provider.dart';
+import '../../../../data/offline_cache.dart';
+import '../../../../data/sync_service.dart';
 
 class InterpellationConfirmationScreen extends ConsumerStatefulWidget {
   const InterpellationConfirmationScreen({super.key});
@@ -89,21 +91,95 @@ class _InterpellationConfirmationScreenState
         _checkController.forward();
       }
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-          _submitError = true;
-          _submitErrorMsg = e.message;
-        });
+      if (e.code == 'NETWORK_ERROR' || e.statusCode == 0 || e.statusCode >= 500) {
+        await _saveOfflineAndShowSuccess(interp);
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+            _submitError = true;
+            _submitErrorMsg = e.message;
+          });
+        }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-          _submitError = true;
-          _submitErrorMsg = 'Erreur réseau. Vérifiez votre connexion.';
-        });
+      await _saveOfflineAndShowSuccess(interp);
+    }
+  }
+
+  Future<void> _saveOfflineAndShowSuccess(InterpellationState interp) async {
+    final now = DateTime.now();
+    final deadline = now.add(const Duration(days: 30));
+    final suffix = _refSuffix();
+    final auth = ref.read(authProvider);
+
+    final bodies = interp.selectedInfractions.map((infraction) {
+      return <String, dynamic>{
+        'infractionTypeId': infraction.id,
+        'driverPhone': interp.driverPhone.isNotEmpty
+            ? interp.driverPhone
+            : '+242000000000',
+        if (interp.driverName.isNotEmpty) 'driverName': interp.driverName,
+        if (interp.vehiclePlate.isNotEmpty) 'vehiclePlate': interp.vehiclePlate,
+        if (interp.driverLicense.isNotEmpty) 'numeroPermis': interp.driverLicense,
+        if (interp.lieuPrecis.isNotEmpty) 'adresseApprox': interp.lieuPrecis,
+        if (interp.gpsLat != null) 'latitude': interp.gpsLat,
+        if (interp.gpsLng != null) 'longitude': interp.gpsLng,
+        'refusSignature': interp.signatureRefused,
+        'verbaliseLe': now.toUtc().toIso8601String(),
+      };
+    }).toList();
+
+    try {
+      for (final body in bodies) {
+        await OfflineCache.instance.queueFine(body);
       }
+      // Force sync retry initialization or sync status refresh
+      await SyncService.instance.syncNow();
+    } catch (e) {
+      debugPrint('Error saving offline: $e');
+    }
+
+    final localFines = interp.selectedInfractions.asMap().entries.map((e) {
+      final idx = e.key;
+      final infraction = e.value;
+      return FineModel(
+        id: 'OFFLINE-$idx-${now.millisecondsSinceEpoch}',
+        reference: 'PV-${now.year}-$suffix-${idx + 1}',
+        driverId: '',
+        driverName: interp.driverName.isNotEmpty ? interp.driverName : 'Conducteur non identifié',
+        vehiclePlate: interp.vehiclePlate,
+        vehicleBrand: interp.vehicleBrand,
+        officerId: auth.userId ?? '',
+        officerName: auth.userName ?? 'Agent PNC',
+        officerBadge: auth.badgeNumber ?? '',
+        infractionCode: infraction.code,
+        infractionLabel: infraction.labelFr,
+        amount: infraction.fineAmount,
+        pointsDeducted: infraction.pointsDeducted,
+        status: FineStatus.pending,
+        issuedAt: now,
+        deadline: deadline,
+        location: interp.lieuPrecis,
+        latitude: interp.gpsLat ?? 0.0,
+        longitude: interp.gpsLng ?? 0.0,
+      );
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _createdFines = localFines;
+        _isSubmitting = false;
+      });
+      _checkController.forward();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Mode hors-ligne : PV enregistré localement et sera synchronisé dès le retour du réseau.'),
+          backgroundColor: AppColors.warning,
+          duration: Duration(seconds: 5),
+        ),
+      );
     }
   }
 

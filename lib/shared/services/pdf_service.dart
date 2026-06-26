@@ -153,12 +153,54 @@ class PvPdfService {
 
                 pw.Spacer(),
 
-                // Signatures
-                _buildSignatureRow(
-                  agentName: agentName,
-                  agentBadge: agentBadge,
-                  signatureRefused: interp.signatureRefused,
-                  driverName: interp.driverName,
+                // Signatures & QR Code de sécurité
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Expanded(
+                      flex: 3,
+                      child: _buildSignatureRow(
+                        agentName: agentName,
+                        agentBadge: agentBadge,
+                        signatureRefused: interp.signatureRefused,
+                        driverName: interp.driverName,
+                      ),
+                    ),
+                    pw.SizedBox(width: 16),
+                    pw.Expanded(
+                      flex: 1,
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Text(
+                            'SCAN VERIFICATION',
+                            style: pw.TextStyle(
+                              fontSize: 6,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _navy,
+                            ),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Container(
+                            height: 60,
+                            width: 60,
+                            padding: const pw.EdgeInsets.all(4),
+                            decoration: pw.BoxDecoration(
+                              color: _white,
+                              border: pw.Border.all(color: _navy, width: 2),
+                              borderRadius: pw.BorderRadius.circular(6),
+                            ),
+                            child: pw.BarcodeWidget(
+                              data: 'PNC-CG://$reference|${interp.driverLicense}|$dateStr',
+                              barcode: pw.Barcode.qrCode(),
+                              color: _navy,
+                              drawText: false,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

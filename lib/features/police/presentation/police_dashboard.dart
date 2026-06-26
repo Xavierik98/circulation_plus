@@ -18,6 +18,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/fine_model.dart';
+import '../../../data/sync_service.dart';
 
 String _firstName(String? fullName) {
   if (fullName == null || fullName.trim().isEmpty) return 'Agent';
@@ -154,6 +155,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     final statsAsync = ref.watch(officerStatsProvider);
     final recentFinesAsync = ref.watch(myFinesProvider);
     final unreadCount = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
+    final pendingCount = ref.watch(pendingFinesCountProvider).valueOrNull ?? 0;
 
     final stats = statsAsync.valueOrNull;
     final officer = OfficerModel(
@@ -190,7 +192,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
                 const SizedBox(height: 24),
                 _buildActivityFeed(recentFinesAsync.valueOrNull ?? []),
                 const SizedBox(height: 24),
-                _buildStatusIndicators(),
+                _buildStatusIndicators(pendingCount),
                 const SizedBox(height: 100),
               ]),
             ),
@@ -686,23 +688,51 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     );
   }
 
-  Widget _buildStatusIndicators() {
+  Widget _buildStatusIndicators(int pendingCount) {
+    final hasPending = pendingCount > 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('État du système', style: AppTextStyles.titleMedium),
         const SizedBox(height: 12),
-        const PremiumCard(
+        PremiumCard(
           child: Column(
             children: [
-              _StatusRow(label: 'Connexion réseau', status: true, detail: '4G LTE'),
-              Divider(height: 20, color: AppColors.divider),
-              _StatusRow(label: 'GPS actif', status: true, detail: 'Précision: 3m'),
-              Divider(height: 20, color: AppColors.divider),
-              _StatusRow(label: 'Serveur central', status: true, detail: 'En ligne'),
-              Divider(height: 20, color: AppColors.divider),
-              _StatusRow(
-                  label: 'Synchronisation', status: true, detail: 'Il y a 2min'),
+              const _StatusRow(label: 'Connexion réseau', status: true, detail: '4G LTE'),
+              const Divider(height: 20, color: AppColors.divider),
+              const _StatusRow(label: 'GPS actif', status: true, detail: 'Précision: 3m'),
+              const Divider(height: 20, color: AppColors.divider),
+              const _StatusRow(label: 'Serveur central', status: true, detail: 'En ligne'),
+              const Divider(height: 20, color: AppColors.divider),
+              InkWell(
+                onTap: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tentative de synchronisation forcée...')),
+                  );
+                  final synced = await SyncService.instance.syncNow();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(synced > 0
+                            ? '$synced PV synchronisé(s) avec succès !'
+                            : 'Aucun PV à synchroniser ou réseau indisponible.'),
+                        backgroundColor: synced > 0 ? AppColors.success : AppColors.textTertiary,
+                      ),
+                    );
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: _StatusRow(
+                    label: 'Synchronisation',
+                    status: !hasPending,
+                    statusColor: hasPending ? AppColors.warning : AppColors.success,
+                    detail: hasPending
+                        ? '$pendingCount en attente ↻'
+                        : 'À jour ✓',
+                  ),
+                ),
+              ),
             ],
           ),
         ).animate().fadeIn(delay: 500.ms),
@@ -766,8 +796,14 @@ class _StatusRow extends StatelessWidget {
   final String label;
   final bool status;
   final String detail;
+  final Color? statusColor;
 
-  const _StatusRow({required this.label, required this.status, required this.detail});
+  const _StatusRow({
+    required this.label,
+    required this.status,
+    required this.detail,
+    this.statusColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -777,11 +813,11 @@ class _StatusRow extends StatelessWidget {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: status ? AppColors.success : AppColors.error,
+            color: statusColor ?? (status ? AppColors.success : AppColors.error),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (status ? AppColors.success : AppColors.error).withValues(alpha: 0.5),
+                color: (statusColor ?? (status ? AppColors.success : AppColors.error)).withValues(alpha: 0.5),
                 blurRadius: 6,
               ),
             ],

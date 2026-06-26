@@ -4,12 +4,14 @@ import '../shared/models/fine_model.dart';
 import '../shared/models/officer_model.dart';
 import '../shared/models/notification_model.dart';
 import '../shared/models/infraction_model.dart';
+import '../shared/models/user_model.dart';
 import 'repositories.dart';
 import 'offline_cache.dart';
 import 'sync_service.dart';
 
 // Repository singletons (ajouts)
 final paymentRepositoryProvider = Provider((_) => PaymentRepository());
+final userRepositoryProvider = Provider((_) => UserRepository());
 
 // Dépôts (singletons).
 final authRepositoryProvider = Provider((_) => AuthRepository());
@@ -123,3 +125,45 @@ final unreadNotificationsCountProvider =
 /// Partagé entre InfractionSelectionScreen → FineCalculationScreen.
 final selectedInfractionsProvider =
     StateProvider<List<InfractionType>>((ref) => []);
+
+// ── Gestion des utilisateurs (admin) ─────────────────────────────────────────
+
+class UsersParams {
+  final String? role;
+  final bool? actif;
+  final String? search;
+  final int page;
+  final int limit;
+
+  const UsersParams({
+    this.role,
+    this.actif,
+    this.search,
+    this.page = 1,
+    this.limit = 30,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is UsersParams &&
+      other.role == role &&
+      other.actif == actif &&
+      other.search == search &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(role, actif, search, page, limit);
+}
+
+/// Liste paginée de tous les comptes (citoyens + police + admin) pour l'écran admin.
+final usersProvider = FutureProvider.autoDispose
+    .family<Page<UserModel>, UsersParams>((ref, params) {
+  return ref.read(userRepositoryProvider).listUsers(
+    role: params.role,
+    actif: params.actif,
+    search: params.search,
+    page: params.page,
+    limit: params.limit,
+  );
+});

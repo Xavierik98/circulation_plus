@@ -30,6 +30,18 @@ export const loginBodySchema = z.object({
 });
 export type LoginBody = z.infer<typeof loginBodySchema>;
 
+// 2FA obligatoire (POLICE / ADMIN) — code à 6 chiffres envoyé par email + SMS.
+export const verify2faBodySchema = z.object({
+  challengeToken: z.string().min(10),
+  code:           z.string().length(6).regex(/^\d{6}$/, 'Code à 6 chiffres requis'),
+});
+export type Verify2faBody = z.infer<typeof verify2faBodySchema>;
+
+export const resend2faBodySchema = z.object({
+  challengeToken: z.string().min(10),
+});
+export type Resend2faBody = z.infer<typeof resend2faBodySchema>;
+
 export const refreshBodySchema = z.object({
   refreshToken: z.string().min(10),
 });

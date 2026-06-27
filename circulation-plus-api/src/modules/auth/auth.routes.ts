@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ok } from '../../shared/utils/response';
+import { AppError } from '../../shared/errors/AppError';
 import { authenticate } from '../../shared/middleware/authenticate';
 import { LOGIN_RATE_LIMIT } from '../../shared/middleware/rateLimit';
 import { z } from 'zod';
@@ -11,8 +12,10 @@ import {
   registerBodySchema,
   changePasswordSchema,
   resendVerificationSchema,
+  verify2faBodySchema,
+  resend2faBodySchema,
 } from './auth.schema';
-import { login, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification, updateProfile, uploadProfilePhoto, forgotPassword, resetPassword, registerFcmToken, revokeFcmToken, unblockIp, listBlockedIps } from './auth.service';
+import { login, verify2fa, resend2fa, refresh, logout, getMe, register, changePassword, verifyEmail, resendVerification, updateProfile, uploadProfilePhoto, forgotPassword, resetPassword, registerFcmToken, revokeFcmToken, unblockIp, listBlockedIps } from './auth.service';
 import { requireRole } from '../../shared/middleware/authenticate';
 
 // ── Page HTML retournée après clic sur le lien de vérification ────────────────
@@ -266,8 +269,47 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const { email, pin, role, lat, lng } = request.body;
       const ua = request.headers['user-agent'] ?? null;
-      const result = await login(email, pin, role, request.ip, ua, lat, lng);
+      const result = await login(email, pin, role, request.ip, app.adapters, ua, lat, lng);
       return ok(result);
+    },
+  );
+
+  // POST /api/auth/verify-2fa — PUBLIC, limité (code à 6 chiffres, 5 essais max).
+  r.post(
+    '/verify-2fa',
+    {
+      config: { rateLimit: LOGIN_RATE_LIMIT },
+      schema: {
+        tags: ['Auth'],
+        summary: 'Vérifie le code 2FA (POLICE/ADMIN) et termine la connexion',
+        description:
+          'PUBLIC. Codes : INVALID_OTP (401), OTP_EXPIRED (400), ' +
+          'OTP_MAX_ATTEMPTS (429), CHALLENGE_EXPIRED (400).',
+        body: verify2faBodySchema,
+      },
+    },
+    async (request) => {
+      const { challengeToken, code } = request.body;
+      const ua = request.headers['user-agent'] ?? null;
+      const result = await verify2fa(challengeToken, code, request.ip, ua);
+      return ok(result);
+    },
+  );
+
+  // POST /api/auth/resend-2fa — PUBLIC, limité.
+  r.post(
+    '/resend-2fa',
+    {
+      config: { rateLimit: LOGIN_RATE_LIMIT },
+      schema: {
+        tags: ['Auth'],
+        summary: 'Renvoie un nouveau code 2FA pour le challenge en cours',
+        body: resend2faBodySchema,
+      },
+    },
+    async (request) => {
+      await resend2fa(request.body.challengeToken, app.adapters);
+      return ok({ sent: true });
     },
   );
 
@@ -423,6 +465,35 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const { ip } = request.params as { ip: string };
       return ok(await unblockIp(ip, request.user!.id));
+    },
+  );
+
+  // POST /api/auth/admin/backup/run — Admin : déclenche manuellement la copie
+  // Neon → Supabase (en plus de la tâche planifiée toutes les 6h).
+  r.post(
+    '/admin/backup/run',
+    {
+      preHandler: [authenticate, requireRole(['ADMIN', 'DIRECTION_GENERALE'])],
+      schema: {
+        tags: ['Auth', 'Admin'],
+        summary: 'Déclenche manuellement la sauvegarde Neon → Supabase',
+        description:
+          'Rôles : ADMIN / DIRECTION_GENERALE. Code SUPABASE_NOT_CONFIGURED (400) ' +
+          'si SUPABASE_DATABASE_URL est absent.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async () => {
+      const { runDatabaseBackup } = await import('../../jobs/dbBackup');
+      try {
+        const result = await runDatabaseBackup();
+        return ok(result);
+      } catch {
+        throw AppError.badRequest(
+          'SUPABASE_DATABASE_URL non configuré.',
+          'SUPABASE_NOT_CONFIGURED',
+        );
+      }
     },
   );
 

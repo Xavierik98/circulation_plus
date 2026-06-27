@@ -5,6 +5,7 @@ import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/role_selection_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/two_factor_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/police/presentation/police_shell.dart';
 import '../features/police/presentation/police_dashboard.dart';
@@ -64,6 +65,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isPublicRoute = location.startsWith('/splash') ||
           location.startsWith('/role') ||
           location.startsWith('/login') ||
+          location.startsWith('/2fa') ||
           location.startsWith('/register') ||
           location.startsWith('/forgot-password') ||
           location.startsWith('/verify-email');
@@ -139,6 +141,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/forgot-password',
         builder: (_, __) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/2fa',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return TwoFactorScreen(
+            challengeToken: extra['challengeToken'] as String,
+            channel: extra['channel'] as String,
+            roleTitle: extra['roleTitle'] as String,
+          );
+        },
       ),
 
       // Police Shell

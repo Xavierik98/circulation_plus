@@ -5,6 +5,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/widgets/premium_button.dart';
 import '../../../data/api_client.dart';
+import '../../../core/utils/congo_phone.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -135,9 +136,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     key: const ValueKey('phone'),
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: CongoPhone.inputFormatters,
                     autofocus: true,
                     style: AppTextStyles.bodyMedium.copyWith(color: textPri),
-                    validator: (v) => (v == null || v.trim().length < 8) ? 'Numéro invalide' : null,
+                    validator: CongoPhone.validator(),
                     decoration: const InputDecoration(
                       labelText: 'Numéro de téléphone',
                       hintText: '+242 06 000 0000',

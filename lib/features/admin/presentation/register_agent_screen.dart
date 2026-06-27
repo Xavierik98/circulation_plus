@@ -11,6 +11,7 @@ import '../../../shared/widgets/premium_button.dart';
 import '../../../shared/widgets/password_strength_indicator.dart';
 import '../../../data/api_client.dart';
 import '../../../data/repositories.dart';
+import '../../../core/utils/congo_phone.dart';
 
 class RegisterAgentScreen extends ConsumerStatefulWidget {
   const RegisterAgentScreen({super.key});
@@ -434,6 +435,7 @@ class _RegisterAgentScreenState extends ConsumerState<RegisterAgentScreen> {
                     TextFormField(
                       controller: _phoneCtrl,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: CongoPhone.inputFormatters,
                       style: AppTextStyles.bodyMedium
                           .copyWith(color: AppColors.textPrimary),
                       decoration: const InputDecoration(
@@ -441,10 +443,7 @@ class _RegisterAgentScreenState extends ConsumerState<RegisterAgentScreen> {
                         prefixIcon: Icon(Icons.phone_rounded,
                             color: AppColors.primary, size: 20),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().length < 8)
-                              ? 'Numéro invalide'
-                              : null,
+                      validator: CongoPhone.validator(),
                     ).animate().fadeIn(delay: 450.ms),
 
                     const SizedBox(height: 24),

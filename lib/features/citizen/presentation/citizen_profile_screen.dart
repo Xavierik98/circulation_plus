@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/widgets/date_input_field.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../data/api_client.dart';
+import '../../../core/utils/congo_phone.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class CitizenProfileScreen extends ConsumerStatefulWidget {
@@ -38,29 +41,6 @@ class _CitizenProfileScreenState extends ConsumerState<CitizenProfileScreen> {
     _licenseCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickBirthDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _birthDate ?? DateTime(now.year - 25),
-      firstDate: DateTime(1930),
-      lastDate: DateTime(now.year - 16),
-      helpText: 'Date de naissance',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-            surface: AppColors.surface,
-            onSurface: AppColors.textPrimary,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _birthDate = picked);
   }
 
   Future<void> _save() async {
@@ -188,6 +168,9 @@ class _CitizenProfileScreenState extends ConsumerState<CitizenProfileScreen> {
               label: 'Téléphone',
               icon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
+              hint: '+242 06 000 0000',
+              inputFormatters: CongoPhone.inputFormatters,
+              validator: CongoPhone.validator(required: false),
             ),
             const SizedBox(height: 14),
 
@@ -200,22 +183,13 @@ class _CitizenProfileScreenState extends ConsumerState<CitizenProfileScreen> {
             const SizedBox(height: 14),
 
             // Date de naissance
-            GestureDetector(
-              onTap: _pickBirthDate,
-              child: AbsorbPointer(
-                child: _buildField(
-                  controller: TextEditingController(
-                    text: _birthDate != null
-                        ? '${_birthDate!.day.toString().padLeft(2, '0')}/'
-                            '${_birthDate!.month.toString().padLeft(2, '0')}/'
-                            '${_birthDate!.year}'
-                        : '',
-                  ),
-                  label: 'Date de naissance (facultatif)',
-                  icon: Icons.calendar_today_outlined,
-                  hint: 'JJ/MM/AAAA',
-                ),
-              ),
+            DateInputField(
+              initialValue: _birthDate,
+              firstDate: DateTime(1930),
+              lastDate: DateTime(DateTime.now().year - 16),
+              label: 'Date de naissance (facultatif)',
+              helpText: 'Date de naissance',
+              onChanged: (d) => setState(() => _birthDate = d),
             ),
             const SizedBox(height: 14),
 
@@ -272,12 +246,14 @@ class _CitizenProfileScreenState extends ConsumerState<CitizenProfileScreen> {
     TextInputType? keyboardType,
     int maxLines = 1,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      inputFormatters: inputFormatters,
       style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,

@@ -6,6 +6,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/widgets/premium_button.dart';
 import '../../../shared/widgets/password_strength_indicator.dart';
+import '../../../core/utils/congo_phone.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -256,6 +257,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: CongoPhone.inputFormatters,
                       style: AppTextStyles.bodyMedium
                           .copyWith(color: AppColors.textPrimary),
                       decoration: const InputDecoration(
@@ -263,11 +265,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         prefixIcon: Icon(Icons.phone_rounded,
                             color: AppColors.congoGreen, size: 20),
                       ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return null; // optionnel
-                        if (v.trim().length < 8) return 'Numéro trop court';
-                        return null;
-                      },
+                      validator: CongoPhone.validator(required: false),
                     ).animate().fadeIn(delay: 400.ms),
 
                     const SizedBox(height: 18),

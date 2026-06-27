@@ -7,12 +7,19 @@ import { redis } from '../../config/redis';
 import { env } from '../../config/env';
 import { AppError } from '../../shared/errors/AppError';
 import { audit } from '../../shared/middleware/audit';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../../config/email';
+import { sendVerificationEmail, sendPasswordResetEmail, send2faCode } from '../../config/email';
+import type { Adapters } from '../../adapters/types';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 jours
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCK_TTL_SECONDS = 15 * 60; // 15 minutes
+
+// ── 2FA obligatoire pour POLICE et ADMIN (comptes à privilèges) ───────────────
+const OTP_TTL_SECONDS = 5 * 60;     // 5 minutes
+const OTP_MAX_ATTEMPTS = 5;
+const CHALLENGE_TTL = '5m';
+const ROLES_REQUIRING_2FA: Role[] = ['POLICE', 'ADMIN'];
 
 // ── IP-level brute-force protection ───────────────────────────────────────────
 const MAX_IP_FAILED_ATTEMPTS = 10;   // 10 failed logins from same IP → block
@@ -131,15 +138,101 @@ function publicUser(user: User): {
   };
 }
 
+// ── 2FA — clés Redis & token de challenge ─────────────────────────────────────
+function otpKey(userId: string): string {
+  return `2fa:otp:${userId}`;
+}
+function otpAttemptsKey(userId: string): string {
+  return `2fa:attempts:${userId}`;
+}
+
+function signChallengeToken(userId: string): string {
+  return jwt.sign({ sub: userId, purpose: '2fa-challenge' }, env.JWT_SECRET, {
+    expiresIn: CHALLENGE_TTL,
+  });
+}
+
+function decodeChallengeToken(token: string): string {
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; purpose: string };
+    if (payload.purpose !== '2fa-challenge') throw new Error('wrong purpose');
+    return payload.sub; // userId
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      throw AppError.badRequest(
+        'Le code a expiré. Demandez un nouveau code.',
+        'CHALLENGE_EXPIRED',
+      );
+    }
+    throw AppError.badRequest('Session de connexion invalide.', 'INVALID_CHALLENGE');
+  }
+}
+
+/** Génère un code à 6 chiffres, le stocke en Redis (5 min) et l'envoie par email + SMS. */
+async function issueAndSend2faCode(
+  user: User,
+  adapters: Adapters,
+): Promise<void> {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  await redis.set(otpKey(user.id), code, 'EX', OTP_TTL_SECONDS);
+  await redis.del(otpAttemptsKey(user.id));
+
+  await send2faCode(user.email, user.name, code);
+  if (user.telephone) {
+    await adapters.sms.send(
+      user.telephone,
+      `Circulation+ : votre code de connexion est ${code}. Valable 5 minutes. Ne le partagez jamais.`,
+    );
+  }
+}
+
+/** Finalise la connexion : émission des tokens + heartbeat GPS + audit log. */
+async function finishLogin(
+  user: User,
+  ip: string | null,
+  userAgent: string | null | undefined,
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
+  const token = signAccessToken(user);
+  const refreshToken = await issueRefreshToken(user.id);
+
+  // Mise à jour GPS pour les agents (lastLat/Lng/SeenAt) si coordonnées fournies.
+  if (lat != null && lng != null && user.role === 'POLICE') {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLat: lat, lastLng: lng, lastSeenAt: new Date() },
+    });
+  }
+
+  await audit(prisma, {
+    userId: user.id,
+    action: 'LOGIN',
+    ip,
+    userAgent: userAgent ?? null,
+    details: {
+      role: user.role,
+      grade: (user as Record<string, unknown>)['grade'] ?? null,
+      ...(lat != null && lng != null ? { lat, lng } : {}),
+    },
+  });
+
+  return { token, refreshToken, user: publicUser(user) };
+}
+
 export async function login(
   email: string,
   pin: string,
   role: 'police' | 'citizen' | 'admin',
   ip: string | null,
+  adapters: Adapters,
   userAgent?: string | null,
   lat?: number | null,
   lng?: number | null,
-): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
+): Promise<
+  | { token: string; refreshToken: string; user: ReturnType<typeof publicUser> }
+  | { requires2fa: true; challengeToken: string; channel: 'email' | 'email+sms' }
+> {
   // 0. Domaine @pnc.cg obligatoire pour les agents.
   if (role === 'police' && !email.toLowerCase().endsWith(PNC_DOMAIN)) {
     throw AppError.unauthorized(
@@ -220,30 +313,79 @@ export async function login(
     );
   }
 
-  const token = signAccessToken(user);
-  const refreshToken = await issueRefreshToken(user.id);
+  // 2FA obligatoire pour les comptes à privilèges (POLICE / ADMIN).
+  if (ROLES_REQUIRING_2FA.includes(user.role)) {
+    await issueAndSend2faCode(user, adapters);
+    const challengeToken = signChallengeToken(user.id);
 
-  // Mise à jour GPS pour les agents (lastLat/Lng/SeenAt) si coordonnées fournies.
-  if (lat != null && lng != null && user.role === 'POLICE') {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLat: lat, lastLng: lng, lastSeenAt: new Date() },
+    await audit(prisma, {
+      userId: user.id,
+      action: 'LOGIN_2FA_REQUESTED',
+      ip,
+      userAgent: userAgent ?? null,
+      details: { role: user.role },
     });
+
+    return {
+      requires2fa: true,
+      challengeToken,
+      channel: user.telephone ? 'email+sms' : 'email',
+    };
   }
 
-  await audit(prisma, {
-    userId: user.id,
-    action: 'LOGIN',
-    ip,
-    userAgent: userAgent ?? null,
-    details: {
-      role: user.role,
-      grade: (user as Record<string, unknown>)['grade'] ?? null,
-      ...(lat != null && lng != null ? { lat, lng } : {}),
-    },
-  });
+  return finishLogin(user, ip, userAgent, lat, lng);
+}
 
-  return { token, refreshToken, user: publicUser(user) };
+/** Étape 2 de la connexion pour POLICE/ADMIN : vérifie le code à 6 chiffres. */
+export async function verify2fa(
+  challengeToken: string,
+  code: string,
+  ip: string | null,
+  userAgent?: string | null,
+  lat?: number | null,
+  lng?: number | null,
+): Promise<{ token: string; refreshToken: string; user: ReturnType<typeof publicUser> }> {
+  const userId = decodeChallengeToken(challengeToken);
+
+  const attempts = await redis.incr(otpAttemptsKey(userId));
+  if (attempts === 1) {
+    await redis.expire(otpAttemptsKey(userId), OTP_TTL_SECONDS);
+  }
+  if (attempts > OTP_MAX_ATTEMPTS) {
+    await redis.del(otpKey(userId));
+    throw AppError.tooManyRequests(
+      'Trop de tentatives. Reconnectez-vous pour recevoir un nouveau code.',
+      'OTP_MAX_ATTEMPTS',
+    );
+  }
+
+  const expected = await redis.get(otpKey(userId));
+  if (!expected) {
+    throw AppError.badRequest('Code expiré. Demandez un nouveau code.', 'OTP_EXPIRED');
+  }
+  if (expected !== code) {
+    throw AppError.unauthorized('Code de vérification invalide.', 'INVALID_OTP');
+  }
+
+  await redis.del(otpKey(userId));
+  await redis.del(otpAttemptsKey(userId));
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.actif) {
+    throw AppError.unauthorized('Compte introuvable ou désactivé.', 'INVALID_CREDENTIALS');
+  }
+
+  return finishLogin(user, ip, userAgent, lat, lng);
+}
+
+/** Renvoie un nouveau code 2FA pour un challenge en cours. */
+export async function resend2fa(challengeToken: string, adapters: Adapters): Promise<void> {
+  const userId = decodeChallengeToken(challengeToken);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw AppError.badRequest('Session de connexion invalide.', 'INVALID_CHALLENGE');
+  }
+  await issueAndSend2faCode(user, adapters);
 }
 
 export async function refresh(

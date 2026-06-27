@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,9 @@ import '../../../../theme/app_text_styles.dart';
 import '../../../../shared/models/interpellation_state.dart';
 import '../../../../shared/widgets/premium_button.dart';
 import '../../../../shared/widgets/glass_card.dart';
+import '../../../../shared/widgets/date_input_field.dart';
 import '../../../../data/repositories.dart';
+import '../../../../core/utils/congo_phone.dart';
 
 /// Écran de saisie/vérification des données du conducteur après scan.
 /// Permis congolais (RC) — PAS de système de points.
@@ -26,7 +29,7 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
   final _nameCtrl    = TextEditingController();
   final _licCtrl     = TextEditingController();
   final _phoneCtrl   = TextEditingController();
-  final _dobCtrl     = TextEditingController();
+  DateTime? _dob;
   final _addressCtrl = TextEditingController();
 
   // Véhicule
@@ -66,7 +69,7 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose(); _licCtrl.dispose(); _phoneCtrl.dispose();
-    _dobCtrl.dispose();  _addressCtrl.dispose();
+    _addressCtrl.dispose();
     _plateCtrl.dispose(); _brandCtrl.dispose();
     _modelCtrl.dispose(); _colorCtrl.dispose();
     super.dispose();
@@ -378,11 +381,14 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
                       required: _hasPermis,
                     ),
                     const SizedBox(height: 12),
-                    _field(
-                      ctrl: _dobCtrl,
+                    DateInputField(
+                      initialValue: _dob,
+                      firstDate: DateTime(1930),
+                      lastDate: DateTime.now(),
                       label: 'Date de naissance',
-                      hint: 'JJ-Mois-AAAA',
                       icon: Icons.cake_outlined,
+                      helpText: 'Date de naissance',
+                      onChanged: (d) => setState(() => _dob = d),
                     ),
                     const SizedBox(height: 12),
                     _field(
@@ -398,6 +404,8 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
                       hint: '+242 06 000 0000',
                       icon: Icons.phone_outlined,
                       keyboard: TextInputType.phone,
+                      formatters: CongoPhone.inputFormatters,
+                      validator: CongoPhone.validator(required: false),
                     ),
                   ],
                 ),
@@ -603,6 +611,8 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
     TextInputType keyboard = TextInputType.text,
     TextCapitalization caps = TextCapitalization.words,
     bool required = false,
+    List<TextInputFormatter>? formatters,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,6 +625,7 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
           controller: ctrl,
           keyboardType: keyboard,
           textCapitalization: caps,
+          inputFormatters: formatters,
           style: AppTextStyles.bodyMedium
               .copyWith(color: AppColors.textPrimary),
           decoration: InputDecoration(
@@ -627,9 +638,10 @@ class _OcrPreviewScreenState extends ConsumerState<OcrPreviewScreen> {
             prefixIconConstraints:
                 const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
-          validator: required
-              ? (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null
-              : null,
+          validator: validator ??
+              (required
+                  ? (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null
+                  : null),
         ),
       ],
     );

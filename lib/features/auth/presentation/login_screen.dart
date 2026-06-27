@@ -77,14 +77,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).login(
+    final result = await ref.read(authProvider.notifier).login(
           role: _userRole,
           email: _emailController.text.trim(),
           pin: _pinController.text.trim(),
         );
     setState(() => _isLoading = false);
 
-    if (!success && mounted) {
+    if (result.requires2fa && mounted) {
+      context.push(
+        '/2fa',
+        extra: {
+          'challengeToken': result.challengeToken,
+          'channel': result.channel,
+          'roleTitle': _roleTitle,
+        },
+      );
+      return;
+    }
+
+    if (!result.success && mounted) {
       _showSnack(ref.read(authProvider).error ?? 'Erreur de connexion');
     }
   }

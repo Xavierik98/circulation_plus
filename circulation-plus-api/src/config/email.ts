@@ -181,6 +181,51 @@ function passwordResetHtml(name: string, link: string): string {
 </html>`;
 }
 
+function twoFaHtml(name: string, code: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+    .card { background: #1e293b; border-radius: 12px; max-width: 480px; margin: 40px auto; padding: 32px; text-align: center; }
+    .logo { font-size: 22px; font-weight: 700; color: #3b82f6; margin-bottom: 24px; }
+    h1 { font-size: 18px; margin: 0 0 12px; color: #f1f5f9; }
+    p { font-size: 14px; color: #94a3b8; line-height: 1.6; }
+    .code { font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #fff; background: #0f172a;
+      border: 1px solid #334155; border-radius: 10px; padding: 16px 12px; margin: 20px 0; }
+    .footer { font-size: 11px; color: #475569; margin-top: 24px; border-top: 1px solid #334155; padding-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🇨🇬 Circulation+</div>
+    <h1>Code de vérification (2FA)</h1>
+    <p>Bonjour <strong>${name}</strong>, voici votre code de connexion :</p>
+    <div class="code">${code}</div>
+    <p>Ce code est valable 5 minutes. Ne le partagez avec personne.</p>
+    <div class="footer">Si vous n'êtes pas à l'origine de cette connexion, ignorez cet email et changez votre mot de passe.</div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function send2faCode(to: string, name: string, code: string): Promise<void> {
+  if (!isConfigured) {
+    console.info(`\n🔐  [EMAIL STUB] Code 2FA pour ${to} : ${code}\n`);
+    return;
+  }
+
+  await transporter!.sendMail({
+    from: `"${FROM_NAME}" <${FROM_ADDRESS}>`,
+    to,
+    subject: 'Circulation+ — Votre code de vérification',
+    html: twoFaHtml(name, code),
+  });
+}
+
 export async function sendPasswordResetEmail(
   to: string,
   name: string,

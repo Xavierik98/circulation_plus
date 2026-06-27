@@ -17,6 +17,9 @@ class Page<T> {
 class AuthRepository {
   final ApiClient _api = ApiClient.instance;
 
+  /// Retourne soit `{user, token, refreshToken}` (connexion directe — citoyens),
+  /// soit `{requires2fa: true, challengeToken, channel}` (POLICE/ADMIN —
+  /// un code à 6 chiffres a été envoyé par email/SMS, voir [verify2fa]).
   Future<Map<String, dynamic>> login(
     String email,
     String pin,
@@ -35,11 +38,33 @@ class AuthRepository {
         if (lng != null) 'lng': lng,
       },
     ) as Map<String, dynamic>;
+    if (data['requires2fa'] == true) return data;
+    await _api.saveTokens(
+      data['token'] as String,
+      data['refreshToken'] as String,
+    );
+    return {'user': data['user'] as Map<String, dynamic>};
+  }
+
+  /// Termine la connexion 2FA (POLICE/ADMIN) avec le code reçu par email/SMS.
+  Future<Map<String, dynamic>> verify2fa(
+    String challengeToken,
+    String code,
+  ) async {
+    final data = await _api.post(
+      '/api/auth/verify-2fa',
+      body: {'challengeToken': challengeToken, 'code': code},
+    ) as Map<String, dynamic>;
     await _api.saveTokens(
       data['token'] as String,
       data['refreshToken'] as String,
     );
     return data['user'] as Map<String, dynamic>;
+  }
+
+  /// Renvoie un nouveau code 2FA pour le challenge en cours.
+  Future<void> resend2fa(String challengeToken) async {
+    await _api.post('/api/auth/resend-2fa', body: {'challengeToken': challengeToken});
   }
 
   Future<Map<String, dynamic>> me() async =>

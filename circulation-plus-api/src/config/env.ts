@@ -15,6 +15,9 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default('*'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL est requis'),
+  // Base de secours (Supabase) — copie périodique complète depuis DATABASE_URL
+  // (Neon). La sauvegarde automatique est désactivée si absent.
+  SUPABASE_DATABASE_URL: optionalStr,
   REDIS_URL: z.string().min(1, 'REDIS_URL est requis'),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET doit faire au moins 32 caractères'),

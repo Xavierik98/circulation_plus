@@ -7,9 +7,11 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/premium_button.dart';
+import '../../../shared/widgets/date_input_field.dart';
 import '../../../data/repositories.dart';
 import '../../../data/api_client.dart';
 import '../../../data/providers.dart';
+import '../../../core/utils/congo_phone.dart';
 import '../../auth/providers/auth_provider.dart';
 
 // ─── Provider local pour la méthode sélectionnée ─────────────────────────────
@@ -35,7 +37,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
   // Trésor public
   final _quittanceController = TextEditingController();
-  final _quittanceDateController = TextEditingController();
+  DateTime? _quittanceDate;
   final _agentTresorController = TextEditingController();
 
   final _paymentRepo = PaymentRepository();
@@ -59,7 +61,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     _successController.dispose();
     _phoneController.dispose();
     _quittanceController.dispose();
-    _quittanceDateController.dispose();
     _agentTresorController.dispose();
     super.dispose();
   }
@@ -73,9 +74,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         return;
       }
     } else {
-      final phone = _phoneController.text.trim();
-      if (phone.length < 8) {
-        _snack('Numéro de téléphone invalide');
+      final phoneError = CongoPhone.validator()(_phoneController.text);
+      if (phoneError != null) {
+        _snack(phoneError);
         return;
       }
     }
@@ -130,15 +131,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   }
 
   Future<void> _processTresor() async {
-    final dateText = _quittanceDateController.text.trim();
-    String? isoDate;
-    if (dateText.isNotEmpty) {
-      // Convertir JJ/MM/AAAA → YYYY-MM-DD
-      final parts = dateText.split('/');
-      if (parts.length == 3) {
-        isoDate = '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
-      }
-    }
+    final isoDate = _quittanceDate != null
+        ? '${_quittanceDate!.year}-'
+            '${_quittanceDate!.month.toString().padLeft(2, '0')}-'
+            '${_quittanceDate!.day.toString().padLeft(2, '0')}'
+        : null;
 
     final result = await _paymentRepo.recordTresor(
       fineId: widget.fineId,
@@ -468,6 +465,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         TextFormField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
+          inputFormatters: CongoPhone.inputFormatters,
           style: AppTextStyles.bodyMedium
               .copyWith(color: AppColors.textPrimary),
           decoration: InputDecoration(
@@ -539,16 +537,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         // Date de paiement
         Text('Date du paiement', style: AppTextStyles.labelMedium),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: _quittanceDateController,
-          keyboardType: TextInputType.datetime,
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.calendar_today_outlined,
-                color: AppColors.gold, size: 18),
-            hintText: 'JJ/MM/AAAA',
-          ),
+        DateInputField(
+          initialValue: _quittanceDate,
+          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+          lastDate: DateTime.now(),
+          label: 'Date du paiement',
+          iconColor: AppColors.gold,
+          helpText: 'Date du paiement',
+          onChanged: (d) => setState(() => _quittanceDate = d),
         ).animate().fadeIn(delay: 100.ms),
 
         const SizedBox(height: 14),

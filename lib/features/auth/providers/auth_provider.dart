@@ -21,6 +21,22 @@ const _demoUsers = {
 
 enum UserRole { police, citizen, admin, none }
 
+/// Résultat de [AuthNotifier.login] — distingue connexion directe (citoyens),
+/// 2FA requis (POLICE/ADMIN) et échec.
+class LoginResult {
+  final bool success;
+  final bool requires2fa;
+  final String? challengeToken;
+  final String? channel;
+
+  const LoginResult._(this.success, this.requires2fa, this.challengeToken, this.channel);
+
+  factory LoginResult.ok() => const LoginResult._(true, false, null, null);
+  factory LoginResult.needs2fa(String challengeToken, String channel) =>
+      LoginResult._(false, true, challengeToken, channel);
+  factory LoginResult.failed() => const LoginResult._(false, false, null, null);
+}
+
 UserRole _roleFromBackend(String? upper) {
   switch (upper) {
     case 'POLICE':
@@ -220,7 +236,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> login({
+  // Coordonnées GPS de la tentative en cours — réutilisées par [verify2fa]
+  // une fois le code validé (heartbeat + passage "En service" de l'agent).
+  double? _pendingLat;
+  double? _pendingLng;
+
+  Future<LoginResult> login({
     required UserRole role,
     required String email,
     required String pin,
@@ -229,47 +250,98 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       // ── Coordonnees GPS (best-effort, non bloquant) ──────────────────────
       final position = await _getPosition();
+      _pendingLat = position?.lat;
+      _pendingLng = position?.lng;
 
       // ── Tentative de connexion sur le backend ────────────────────────────
-      final user = await _repo.login(
+      final data = await _repo.login(
         email,
         pin,
         role.name,
         lat: position?.lat,
         lng: position?.lng,
       );
-      await _persist(user);
-      state = AuthState(
-        role: _roleFromBackend(user['role'] as String?),
-        userId: user['id'] as String?,
-        userName: user['name'] as String?,
-        badgeNumber: user['badgeNumber'] as String?,
-        telephone: user['telephone'] as String?,
-        email: user['email'] as String?,
-        photoUrl: user['photoUrl'] as String?,
-        mustChangePassword: user['mustChangePassword'] as bool? ?? false,
-        emailVerified: user['emailVerified'] as bool? ?? true,
-      );
-      // Enregistrer le token FCM pour les notifications push.
-      _pushFcmToken();
-      // Démarrer le timer de session (30 min d'inactivité → déconnexion).
-      resetSessionTimer();
-      // Passer automatiquement "En service" pour les agents police.
-      if (_roleFromBackend(user['role'] as String?) == UserRole.police) {
-        _setOnDutyAuto(position?.lat, position?.lng);
+
+      if (data['requires2fa'] == true) {
+        state = state.copyWith(isLoading: false, error: null);
+        return LoginResult.needs2fa(
+          data['challengeToken'] as String,
+          data['channel'] as String,
+        );
       }
-      return true;
+
+      final user = data['user'] as Map<String, dynamic>;
+      await _completeLogin(user, position?.lat, position?.lng);
+      return LoginResult.ok();
     } on ApiException catch (e) {
       // Erreur réseau (backend injoignable) → mode démo offline
       if (e.code == 'NETWORK_ERROR') {
-        return _loginDemo(email, pin);
+        return _loginDemo(email, pin) ? LoginResult.ok() : LoginResult.failed();
       }
       // Erreur métier (mauvais identifiants, etc.) → on affiche le message
       state = state.copyWith(isLoading: false, error: e.message);
-      return false;
+      return LoginResult.failed();
     } catch (_) {
       // Autre erreur inattendue → tenter le mode démo
-      return _loginDemo(email, pin);
+      return _loginDemo(email, pin) ? LoginResult.ok() : LoginResult.failed();
+    }
+  }
+
+  /// Étape 2 — valide le code 2FA reçu par email/SMS (POLICE/ADMIN).
+  Future<bool> verify2fa(String challengeToken, String code) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final user = await _repo.verify2fa(challengeToken, code);
+      await _completeLogin(user, _pendingLat, _pendingLng);
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Code de vérification invalide.',
+      );
+      return false;
+    }
+  }
+
+  /// Demande un nouveau code 2FA pour le challenge en cours.
+  Future<bool> resend2fa(String challengeToken) async {
+    try {
+      await _repo.resend2fa(challengeToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Finalise la connexion (directe ou après 2FA) : persiste l'état, démarre
+  /// le timer de session, enregistre le token FCM, passe l'agent en service.
+  Future<void> _completeLogin(
+    Map<String, dynamic> user,
+    double? lat,
+    double? lng,
+  ) async {
+    await _persist(user);
+    state = AuthState(
+      role: _roleFromBackend(user['role'] as String?),
+      userId: user['id'] as String?,
+      userName: user['name'] as String?,
+      badgeNumber: user['badgeNumber'] as String?,
+      telephone: user['telephone'] as String?,
+      email: user['email'] as String?,
+      photoUrl: user['photoUrl'] as String?,
+      mustChangePassword: user['mustChangePassword'] as bool? ?? false,
+      emailVerified: user['emailVerified'] as bool? ?? true,
+    );
+    // Enregistrer le token FCM pour les notifications push.
+    _pushFcmToken();
+    // Démarrer le timer de session (30 min d'inactivité → déconnexion).
+    resetSessionTimer();
+    // Passer automatiquement "En service" pour les agents police.
+    if (_roleFromBackend(user['role'] as String?) == UserRole.police) {
+      _setOnDutyAuto(lat, lng);
     }
   }
 

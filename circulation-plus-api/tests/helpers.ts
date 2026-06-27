@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import type { Role, NiveauHierarchique } from '@prisma/client';
 import { buildApp } from '../src/app';
 import { prisma } from '../src/config/database';
+import { redis } from '../src/config/redis';
 
 export async function makeApp() {
   const app = await buildApp();
@@ -58,6 +60,12 @@ export async function createInfractionType(params?: {
 
 type InjectableApp = Awaited<ReturnType<typeof makeApp>>;
 
+/**
+ * Connexion de test. POLICE/ADMIN déclenchent désormais un challenge 2FA :
+ * on lit le code directement dans Redis (accès complet en environnement de
+ * test) et on termine la connexion via /api/auth/verify-2fa de façon
+ * transparente, pour ne pas casser les appelants existants.
+ */
 export async function login(
   app: InjectableApp,
   email: string,
@@ -70,6 +78,26 @@ export async function login(
     payload: { email, pin, role },
   });
   const body = res.json();
+
+  if (body?.data?.requires2fa) {
+    const challengeToken = body.data.challengeToken as string;
+    const { sub: userId } = jwt.decode(challengeToken) as { sub: string };
+    const code = await redis.get(`2fa:otp:${userId}`);
+
+    const res2 = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify-2fa',
+      payload: { challengeToken, code },
+    });
+    const body2 = res2.json();
+    return {
+      status: res2.statusCode,
+      body: body2,
+      token: body2?.data?.token ?? '',
+      refreshToken: body2?.data?.refreshToken ?? '',
+    };
+  }
+
   return {
     status: res.statusCode,
     body,

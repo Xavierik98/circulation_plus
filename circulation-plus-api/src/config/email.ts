@@ -20,6 +20,10 @@ const isConfigured =
 export const isEmailConfigured = isConfigured;
 
 // ── Transporter ──────────────────────────────────────────────────────────────
+// family: 4 — force IPv4. Sans ça, sur des hébergeurs sans routage IPv6
+// (ex. Railway), Node résout smtp.gmail.com en AAAA et échoue avec
+// "ENETUNREACH" en tentant de joindre l'adresse IPv6, alors que l'IPv4
+// fonctionnerait. C'est la cause des emails jamais envoyés en production.
 const transporter = isConfigured
   ? nodemailer.createTransport({
       host:   process.env['SMTP_HOST'],
@@ -29,7 +33,10 @@ const transporter = isConfigured
         user: process.env['SMTP_USER'],
         pass: process.env['SMTP_PASS'],
       },
-    })
+      // `family` n'est pas dans les types nodemailer mais est transmis tel
+      // quel à net.connect/tls.connect — voir commentaire ci-dessus.
+      family: 4,
+    } as nodemailer.TransportOptions)
   : null;
 
 const FROM_NAME    = 'Circulation+ Congo';

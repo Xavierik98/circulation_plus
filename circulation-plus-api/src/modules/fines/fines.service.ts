@@ -8,6 +8,7 @@ import { audit } from '../../shared/middleware/audit';
 import { notify } from '../../shared/utils/fcm';
 import { smsTemplates } from '../../shared/utils/sms';
 import { createConvocation } from '../convocations/convocations.service';
+import { normalizePhone, phoneVariants } from '../../shared/utils/phone';
 import type { CreateFineBody } from './fines.schema';
 
 const FINE_INCLUDE = {
@@ -63,13 +64,14 @@ async function resolveDriverAndVehicle(
 
   if (body.numeroPermis) {
     const { prenom, nom } = splitName(body.driverName);
+    const telephone = normalizePhone(body.driverPhone);
     const driver = await tx.driver.upsert({
       where: { numeroPermis: body.numeroPermis },
-      update: { telephone: body.driverPhone },
+      update: { telephone },
       create: {
         nom,
         prenom,
-        telephone: body.driverPhone,
+        telephone,
         numeroPermis: body.numeroPermis,
       },
     });
@@ -124,9 +126,11 @@ export async function createFine(
   const montantDeveloppeur = env.PART_DEVELOPPEUR; // 1 000 XAF → compte développeurs
   const montantTotal = montantAmende + montantDeveloppeur; // total payé par le contrevenant
 
-  // Rattachement best-effort à un compte citoyen (téléphone identique).
+  // Rattachement à un compte citoyen existant — comparaison sur toutes les
+  // variantes plausibles du numéro (+242XXXXXXXXX, 0XXXXXXXX, XXXXXXXX) pour
+  // matcher aussi les comptes enregistrés avant cette normalisation.
   const citizen = await prisma.user.findFirst({
-    where: { role: 'CITOYEN', telephone: body.driverPhone },
+    where: { role: 'CITOYEN', telephone: { in: phoneVariants(body.driverPhone) } },
     select: { id: true },
   });
 

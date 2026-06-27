@@ -16,6 +16,9 @@ const isConfigured =
   Boolean(process.env['SMTP_USER']) &&
   Boolean(process.env['SMTP_PASS']);
 
+/** `true` si un SMTP réel est configuré (sinon mode stub — emails simulés en log). */
+export const isEmailConfigured = isConfigured;
+
 // ── Transporter ──────────────────────────────────────────────────────────────
 const transporter = isConfigured
   ? nodemailer.createTransport({

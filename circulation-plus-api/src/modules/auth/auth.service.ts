@@ -7,8 +7,14 @@ import { redis } from '../../config/redis';
 import { env } from '../../config/env';
 import { AppError } from '../../shared/errors/AppError';
 import { audit } from '../../shared/middleware/audit';
-import { sendVerificationEmail, sendPasswordResetEmail, send2faCode } from '../../config/email';
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  send2faCode,
+  isEmailConfigured,
+} from '../../config/email';
 import type { Adapters } from '../../adapters/types';
+import { normalizePhone, phoneVariants } from '../../shared/utils/phone';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 jours
@@ -177,13 +183,23 @@ async function issueAndSend2faCode(
   await redis.set(otpKey(user.id), code, 'EX', OTP_TTL_SECONDS);
   await redis.del(otpAttemptsKey(user.id));
 
-  await send2faCode(user.email, user.name, code);
-  if (user.telephone) {
-    await adapters.sms.send(
-      user.telephone,
-      `Circulation+ : votre code de connexion est ${code}. Valable 5 minutes. Ne le partagez jamais.`,
+  // Envoi en arrière-plan — le code est déjà en Redis, un SMTP/SMS lent ne
+  // doit pas ralentir la connexion (gros gain de rapidité pour POLICE/ADMIN).
+  setImmediate(() => {
+    send2faCode(user.email, user.name, code).catch((err: unknown) =>
+      console.warn(`[2fa] ⚠️ Échec envoi email à ${user.email} :`, (err as Error).message),
     );
-  }
+    if (user.telephone) {
+      adapters.sms
+        .send(
+          user.telephone,
+          `Circulation+ : votre code de connexion est ${code}. Valable 5 minutes. Ne le partagez jamais.`,
+        )
+        .catch((err: unknown) =>
+          console.warn(`[2fa] ⚠️ Échec envoi SMS à ${user.telephone} :`, (err as Error).message),
+        );
+    }
+  });
 }
 
 /** Finalise la connexion : émission des tokens + heartbeat GPS + audit log. */
@@ -453,6 +469,18 @@ export async function revokeAllRefreshTokens(userId: string): Promise<void> {
 }
 
 // Inscription citoyen — auto-inscription publique (rôle CITOYEN uniquement).
+/**
+ * Rattache au compte citoyen les PV déjà émis pour ce numéro de téléphone
+ * avant son inscription (`citizenId` encore null). Permet à un conducteur
+ * verbalisé puis inscrit après-coup de retrouver ses amendes.
+ */
+async function claimOrphanFines(userId: string, telephone: string): Promise<void> {
+  await prisma.fine.updateMany({
+    where: { citizenId: null, driver: { telephone: { in: phoneVariants(telephone) } } },
+    data: { citizenId: userId },
+  });
+}
+
 export async function register(
   name: string,
   email: string,
@@ -477,6 +505,7 @@ export async function register(
   }
 
   const pinHash = await bcrypt.hash(pin, 10);
+  const normalizedPhone = telephone ? normalizePhone(telephone) : undefined;
 
   // En développement : email auto-vérifié → connexion immédiate sans lien.
   // En production : emailVerified=false → le citoyen doit cliquer sur le lien (24 h).
@@ -487,13 +516,16 @@ export async function register(
     data: {
       email,
       name,
-      telephone,
+      telephone: normalizedPhone,
       pinHash,
       role: 'CITOYEN',
       emailVerified: isDev, // true en dev → connexion immédiate
       emailVerificationToken: null,
     },
   });
+
+  // Rattacher les éventuels PV déjà émis pour ce numéro avant l'inscription.
+  if (normalizedPhone) await claimOrphanFines(user.id, normalizedPhone);
 
   // Générer le token JWT de vérification (signé, expire dans 24 h)
   const emailVerificationToken = signEmailVerificationToken(user.id);
@@ -521,9 +553,12 @@ export async function register(
       .catch((err: unknown) => console.warn(`[email] ⚠️ Échec envoi à ${email} :`, (err as Error).message));
   });
 
-  // En mode stub (pas de SMTP), on retourne l'URL pour que le client puisse
-  // vérifier manuellement ou afficher un message adapté.
-  const verificationUrl = isDev ? undefined : rawUrl;
+  // En mode stub (pas de SMTP configuré), on retourne l'URL pour que le client
+  // puisse vérifier manuellement. Dès qu'un SMTP réel est configuré (dev ou
+  // prod), on ne renvoie JAMAIS le lien dans la réponse — sinon n'importe qui
+  // peut s'auto-vérifier sans jamais avoir accès à la boîte mail, ce qui
+  // annule complètement la vérification d'email comme contrôle de sécurité.
+  const verificationUrl = isEmailConfigured ? undefined : rawUrl;
 
   return { token, refreshToken, user: publicUser(user), verificationUrl };
 }
@@ -611,9 +646,17 @@ export async function updateProfile(
 
   const data: { name?: string; telephone?: string } = {};
   if (name !== undefined && name.trim().length > 0) data.name = name.trim();
-  if (telephone !== undefined) data.telephone = telephone.trim();
+  if (telephone !== undefined && telephone.trim().length > 0) {
+    data.telephone = normalizePhone(telephone);
+  }
 
   const updated = await prisma.user.update({ where: { id: userId }, data });
+
+  // Numéro renseigné/modifié : rattacher les PV émis sous ce numéro avant.
+  if (user.role === 'CITOYEN' && data.telephone) {
+    await claimOrphanFines(userId, data.telephone);
+  }
+
   return publicUser(updated);
 }
 
@@ -708,11 +751,15 @@ export async function forgotPassword(identifier: string): Promise<void> {
   const token = randomUUID();
   await redis.set(resetKey(token), user.id, 'EX', RESET_TTL_SECONDS);
 
-  try {
-    await sendPasswordResetEmail(user.email, user.name, token);
-  } catch {
-    // Email non bloquant — le token est déjà en Redis
-  }
+  // Envoi en arrière-plan — ne bloque pas la réponse au client (le token est
+  // déjà en Redis ; un SMTP lent ne doit pas ralentir "mot de passe oublié").
+  setImmediate(() => {
+    sendPasswordResetEmail(user.email, user.name, token)
+      .then(() => console.info(`[email] ✅ Reset envoyé à ${user.email}`))
+      .catch((err: unknown) =>
+        console.warn(`[email] ⚠️ Échec envoi reset à ${user.email} :`, (err as Error).message),
+      );
+  });
 }
 
 // Enregistrement du token FCM pour les notifications push.

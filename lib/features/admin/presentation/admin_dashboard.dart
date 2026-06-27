@@ -599,6 +599,8 @@ class AdminDashboard extends ConsumerWidget {
        gradient: AppColors.primaryGradient, route: '/admin/fines'),
       (icon: Icons.person_add_alt_1_rounded, label: 'Ajouter agent', subtitle: 'Enregistrement PNC',
        gradient: AppColors.successGradient, route: '/admin/add-agent'),
+      (icon: Icons.manage_accounts_rounded, label: 'Utilisateurs',  subtitle: 'Comptes & accès',
+       gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF4338CA)]), route: '/admin/users'),
       (icon: Icons.block_rounded, label: 'Suspensions',           subtitle: 'Historique & statuts',
        gradient: const LinearGradient(colors: [AppColors.error, Color(0xFFB71C1C)]), route: '__suspensions__'),
       (icon: Icons.bar_chart_rounded, label: 'Revenus',            subtitle: 'Analyse financière',

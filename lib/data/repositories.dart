@@ -2,6 +2,7 @@ import '../shared/models/fine_model.dart';
 import '../shared/models/officer_model.dart';
 import '../shared/models/notification_model.dart';
 import '../shared/models/infraction_model.dart';
+import '../shared/models/user_model.dart';
 import 'api_client.dart';
 import 'mappers.dart';
 
@@ -238,6 +239,35 @@ class FineRepository {
         await _api.get('/api/fines/$fineId/pdf') as Map<String, dynamic>;
     return data['url'] as String;
   }
+
+  Future<Page<FineModel>> listAdmin({
+    String? status,
+    String? dateFrom,
+    String? dateTo,
+    int page = 1,
+    int limit = 25,
+  }) async {
+    final data = await _api.get('/api/fines', query: {
+      if (status != null) 'status': status,
+      if (dateFrom != null) 'dateFrom': dateFrom,
+      if (dateTo != null) 'dateTo': dateTo,
+      'page': page,
+      'limit': limit,
+    }) as Map<String, dynamic>;
+    final items = (data['data'] as List<dynamic>)
+        .map((e) => fineFromJson(e as Map<String, dynamic>))
+        .toList();
+    return Page(
+      items,
+      (data['total'] as num).toInt(),
+      (data['page'] as num).toInt(),
+      (data['limit'] as num).toInt(),
+    );
+  }
+
+  Future<void> updateStatus(String fineId, String status) async {
+    await _api.patch('/api/fines/$fineId/status', body: {'status': status});
+  }
 }
 
 class OfficerRepository {
@@ -361,6 +391,48 @@ class DriverRepository {
       if (plate != null) 'plate': plate,
       if (license != null) 'license': license,
     }) as Map<String, dynamic>;
+  }
+}
+
+class UserRepository {
+  final ApiClient _api = ApiClient.instance;
+
+  Future<Page<UserModel>> listUsers({
+    String? role,
+    bool? actif,
+    String? search,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final data = await _api.get('/api/admin/users', query: {
+      'page': page,
+      'limit': limit,
+      if (role != null) 'role': role,
+      if (actif != null) 'actif': actif,
+      if (search != null && search.isNotEmpty) 'search': search,
+    }) as Map<String, dynamic>;
+    final items = (data['data'] as List<dynamic>)
+        .map((e) => UserModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return Page(
+      items,
+      (data['total'] as num).toInt(),
+      (data['page'] as num).toInt(),
+      (data['limit'] as num).toInt(),
+    );
+  }
+
+  Future<UserModel> getUserById(String id) async {
+    final data = await _api.get('/api/admin/users/$id') as Map<String, dynamic>;
+    return UserModel.fromJson(data);
+  }
+
+  Future<void> setUserStatus(String id, bool actif) async {
+    await _api.patch('/api/admin/users/$id/status', body: {'actif': actif});
+  }
+
+  Future<void> deleteUser(String id) async {
+    await _api.delete('/api/admin/users/$id');
   }
 }
 

@@ -512,27 +512,18 @@ export async function register(
 
   await audit(prisma, { userId: user.id, action: 'REGISTER', ip, userAgent: userAgent ?? null });
 
-  let verificationUrl: string | undefined;
+  const rawUrl = `${env.BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(emailVerificationToken)}`;
 
-  if (isDev) {
-    // Compte déjà actif en dev. On tente d'envoyer le mail si SMTP est configuré.
-    try {
-      await sendVerificationEmail(email, name, emailVerificationToken);
-      console.info(`[email] ✅ Mail de bienvenue envoyé à ${email}`);
-    } catch (err) {
-      console.warn(`[email] ⚠️  Échec envoi mail à ${email} :`, (err as Error).message);
-      // Non bloquant — le compte est déjà actif
-    }
-  } else {
-    // Production : envoi obligatoire
-    const rawUrl = `${env.BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(emailVerificationToken)}`;
-    try {
-      await sendVerificationEmail(email, name, emailVerificationToken);
-    } catch (err) {
-      console.error('[email] Échec envoi vérification :', err);
-      verificationUrl = rawUrl; // Retourner l'URL pour déblocage manuel (mode stub)
-    }
-  }
+  // Envoi de l'email en arrière-plan — ne bloque pas la réponse au client.
+  setImmediate(() => {
+    sendVerificationEmail(email, name, emailVerificationToken)
+      .then(() => console.info(`[email] ✅ Mail envoyé à ${email}`))
+      .catch((err: unknown) => console.warn(`[email] ⚠️ Échec envoi à ${email} :`, (err as Error).message));
+  });
+
+  // En mode stub (pas de SMTP), on retourne l'URL pour que le client puisse
+  // vérifier manuellement ou afficher un message adapté.
+  const verificationUrl = isDev ? undefined : rawUrl;
 
   return { token, refreshToken, user: publicUser(user), verificationUrl };
 }

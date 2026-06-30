@@ -7,9 +7,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
-import '../../../shared/widgets/premium_button.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../theme/stitch_colors.dart';
 import '../../../data/providers.dart';
 import '../../../data/repositories.dart';
 
@@ -180,7 +179,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: AppColors.error,
+      backgroundColor: StitchColors.error,
       behavior: SnackBarBehavior.floating,
     ));
   }
@@ -190,19 +189,19 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     final receiptAsync = ref.watch(receiptProvider(widget.fineId));
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: StitchColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: StitchColors.surface,
         leading: GestureDetector(
           onTap: () => context.go('/citizen'),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
+              color: StitchColors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 16, color: AppColors.textPrimary),
+                size: 16, color: StitchColors.onSurface),
           ),
         ),
         title: const Column(
@@ -234,12 +233,12 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           child: Container(
               height: 3,
               decoration:
-                  const BoxDecoration(gradient: AppColors.congoFlagGradient)),
+                  const BoxDecoration(gradient: StitchColors.congoFlagGradient)),
         ),
       ),
       body: receiptAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+          child: CircularProgressIndicator(color: StitchColors.primary),
         ),
         error: (e, _) => Center(
           child: Padding(
@@ -248,22 +247,22 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.error_outline_rounded,
-                    size: 48, color: AppColors.error),
+                    size: 48, color: StitchColors.error),
                 const SizedBox(height: 16),
                 Text('Reçu introuvable',
-                    style: AppTextStyles.titleMedium,
+                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: StitchColors.onSurface),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 Text(e.toString(),
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.textTertiary),
+                    style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                        .copyWith(color: StitchColors.onSurfaceVariant),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 TextButton(
                   onPressed: () => context.go('/citizen'),
                   child: Text('Retour à l\'accueil',
-                      style: AppTextStyles.labelMedium
-                          .copyWith(color: AppColors.primary)),
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant)
+                          .copyWith(color: StitchColors.primary)),
                 ),
               ],
             ),
@@ -339,9 +338,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: StitchColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: StitchColors.outlineVariant),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withValues(alpha: 0.2),
@@ -356,7 +355,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: const BoxDecoration(
-              gradient: AppColors.successGradient,
+              gradient: const LinearGradient(colors: [StitchColors.primary, StitchColors.primaryContainer]),
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
@@ -374,16 +373,16 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'REÇU DE PAIEMENT',
-                  style: AppTextStyles.overline.copyWith(
+                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: StitchColors.onSurfaceVariant).copyWith(
                       color: Colors.white.withValues(alpha: 0.9),
                       letterSpacing: 3),
                 ),
                 const SizedBox(height: 8),
                 Text('République du Congo',
-                    style: AppTextStyles.bodySmall
+                    style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
                         .copyWith(color: Colors.white.withValues(alpha: 0.8))),
                 Text('Ministère de l\'Intérieur — DGST',
-                    style: AppTextStyles.caption
+                    style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)
                         .copyWith(color: Colors.white.withValues(alpha: 0.7))),
               ],
             ),
@@ -410,7 +409,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 _ReceiptRow(label: 'Date d\'infraction', value: fineDateStr),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: AppColors.divider),
+                  child: Divider(color: StitchColors.outlineVariant),
                 ),
                 _ReceiptRow(label: 'Mode de paiement', value: modeLabel),
                 const SizedBox(height: 8),
@@ -434,11 +433,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               children: [
                 Text('MONTANT TOTAL',
                     style:
-                        AppTextStyles.labelMedium.copyWith(letterSpacing: 1.5)),
+                        GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant).copyWith(letterSpacing: 1.5)),
                 Text(
                   '${_fmtXaf(montant)} FCFA',
-                  style: AppTextStyles.headlineSmall
-                      .copyWith(color: AppColors.success),
+                  style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: StitchColors.onSurface)
+                      .copyWith(color: StitchColors.primary),
                 ),
               ],
             ),
@@ -454,11 +453,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 children: [
                   Row(children: [
                     const Icon(Icons.pie_chart_outline_rounded,
-                        size: 14, color: AppColors.textTertiary),
+                        size: 14, color: StitchColors.onSurfaceVariant),
                     const SizedBox(width: 6),
                     Text('Répartition des fonds',
-                        style: AppTextStyles.labelSmall
-                            .copyWith(color: AppColors.textTertiary)),
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: StitchColors.onSurfaceVariant)
+                            .copyWith(color: StitchColors.onSurfaceVariant)),
                   ]),
                   const SizedBox(height: 10),
                   if (partAgent != null)
@@ -485,17 +484,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
+                    color: StitchColors.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.cardBorder),
+                    border: Border.all(color: StitchColors.outlineVariant),
                   ),
                   child: CustomPaint(painter: _QrMockPainter()),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Scannez pour vérifier\n$fineRef',
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textTertiary),
+                  style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)
+                      .copyWith(color: StitchColors.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -503,20 +502,20 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
+                    color: StitchColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3)),
+                        color: StitchColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.verified_rounded,
-                          size: 14, color: AppColors.success),
+                          size: 14, color: StitchColors.primary),
                       const SizedBox(width: 6),
                       Text('Document authentique — DGST Congo',
-                          style: AppTextStyles.caption
-                              .copyWith(color: AppColors.success)),
+                          style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)
+                              .copyWith(color: StitchColors.primary)),
                     ],
                   ),
                 ),
@@ -531,12 +530,21 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   Widget _buildActions(BuildContext context, Map<String, dynamic> receipt) {
     return Column(
       children: [
-        PremiumButton(
-          label: _pdfLoading ? 'Génération du PDF...' : 'Télécharger le PDF',
-          icon: Icons.download_rounded,
-          gradient: AppColors.successGradient,
-          isLoading: _pdfLoading,
-          onPressed: _pdfLoading ? null : () => _downloadPdf(receipt),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: _pdfLoading ? null : () => _downloadPdf(receipt),
+            icon: _pdfLoading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.download_rounded),
+            label: Text(_pdfLoading ? 'Génération du PDF...' : 'Télécharger le PDF', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: StitchColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
         ).animate().fadeIn(delay: 300.ms),
         const SizedBox(height: 12),
         Row(
@@ -547,19 +555,19 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 child: Container(
                   height: 52,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.cardBorder),
+                    border: Border.all(color: StitchColors.outlineVariant),
                     borderRadius: BorderRadius.circular(14),
-                    color: AppColors.surfaceVariant,
+                    color: StitchColors.surfaceContainerLow,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.print_outlined,
-                          size: 18, color: AppColors.textTertiary),
+                          size: 18, color: StitchColors.onSurfaceVariant),
                       const SizedBox(width: 8),
                       Text('Imprimer',
-                          style: AppTextStyles.buttonMedium
-                              .copyWith(color: AppColors.textTertiary)),
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: StitchColors.onSurface)
+                              .copyWith(color: StitchColors.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -572,19 +580,19 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 child: Container(
                   height: 52,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.cardBorder),
+                    border: Border.all(color: StitchColors.outlineVariant),
                     borderRadius: BorderRadius.circular(14),
-                    color: AppColors.surfaceVariant,
+                    color: StitchColors.surfaceContainerLow,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.share_outlined,
-                          size: 18, color: AppColors.textTertiary),
+                          size: 18, color: StitchColors.onSurfaceVariant),
                       const SizedBox(width: 8),
                       Text('Partager',
-                          style: AppTextStyles.buttonMedium
-                              .copyWith(color: AppColors.textTertiary)),
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: StitchColors.onSurface)
+                              .copyWith(color: StitchColors.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -597,7 +605,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           onPressed: () => context.go('/citizen'),
           child: Text('Retour à l\'accueil',
               style:
-                  AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+                  GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant).copyWith(color: StitchColors.primary)),
         ).animate().fadeIn(delay: 500.ms),
       ],
     );
@@ -637,12 +645,12 @@ class _RepartRow extends StatelessWidget {
         children: [
           Expanded(
               child: Text(label,
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textTertiary))),
+                  style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)
+                      .copyWith(color: StitchColors.onSurfaceVariant))),
           Text(
             '${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} XAF',
-            style: AppTextStyles.caption
-                .copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+            style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)
+                .copyWith(color: StitchColors.onSurfaceVariant, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -666,16 +674,16 @@ class _ReceiptRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 2, child: Text(label, style: AppTextStyles.bodySmall)),
+        Expanded(flex: 2, child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant))),
         Expanded(
           flex: 3,
           child: Text(
             value,
             style: isMono
-                ? AppTextStyles.mono
-                    .copyWith(fontSize: 11, color: AppColors.primary)
-                : AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textPrimary,
+                ? GoogleFonts.courierPrime(fontSize: 13, color: StitchColors.onSurface)
+                    .copyWith(fontSize: 11, color: StitchColors.primary)
+                : GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant).copyWith(
+                    color: StitchColors.onSurface,
                     fontWeight:
                         bold ? FontWeight.w600 : FontWeight.w500,
                   ),
@@ -701,7 +709,7 @@ class _DashedPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.divider
+      ..color = StitchColors.outlineVariant
       ..strokeWidth = 1;
     double x = 0;
     while (x < size.width) {
@@ -718,7 +726,7 @@ class _QrMockPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.textSecondary
+      ..color = StitchColors.onSurfaceVariant
       ..style = PaintingStyle.fill;
     final cell = size.width / 7;
     const pattern = [

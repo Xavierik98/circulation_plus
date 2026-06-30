@@ -1,24 +1,35 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/models/officer_model.dart';
-import '../../../shared/widgets/stat_card.dart';
-import '../../../shared/widgets/glass_card.dart';
-import '../../../shared/widgets/status_badge.dart';
-import '../../../shared/widgets/animated_counter.dart';
-import '../../../shared/widgets/pnc_badge.dart';
 import '../../../data/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../../shared/widgets/user_avatar.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/fine_model.dart';
 import '../../../data/sync_service.dart';
+
+// Stitch Design System Colors
+class _StitchColors {
+  static const Color primary = Color(0xFF006B2E);
+  static const Color primaryContainer = Color(0xFF00873C);
+  static const Color secondary = Color(0xFF6D5E00);
+  static const Color secondaryContainer = Color(0xFFFCDF4B);
+  static const Color tertiary = Color(0xFFBB0014);
+  static const Color background = Color(0xFFF9F9FC);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color onSurface = Color(0xFF1A1C1E);
+  static const Color onSurfaceVariant = Color(0xFF3E4A3E);
+  static const Color outlineVariant = Color(0xFFBDCABA);
+  static const Color surfaceContainerHigh = Color(0xFFE8E8EA);
+  static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
+  static const Color errorContainer = Color(0xFFFFDAD6);
+  static const Color onErrorContainer = Color(0xFF93000A);
+}
 
 String _firstName(String? fullName) {
   if (fullName == null || fullName.trim().isEmpty) return 'Agent';
@@ -40,26 +51,42 @@ class PoliceDashboard extends ConsumerStatefulWidget {
 }
 
 class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
-  // L'auth passe automatiquement en service à la connexion (_setOnDutyAuto)
   bool _onDuty = true;
   bool _statusLoading = false;
   Timer? _gpsTimer;
+  Timer? _timeTimer;
+  String _timeString = '12:00';
 
   @override
   void initState() {
     super.initState();
-    // Envoi immédiat d'un heartbeat GPS dès l'ouverture du dashboard
+    // GPS updates
     WidgetsBinding.instance.addPostFrameCallback((_) => _sendGpsHeartbeat());
-    // Heartbeat GPS toutes les 30s quand l'agent est en service
     _gpsTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_onDuty) _sendGpsHeartbeat();
     });
+
+    // Time updates for Stitch status bar
+    _updateTime();
+    _timeTimer = Timer.periodic(const Duration(seconds: 10), (_) => _updateTime());
   }
 
   @override
   void dispose() {
     _gpsTimer?.cancel();
+    _timeTimer?.cancel();
     super.dispose();
+  }
+
+  void _updateTime() {
+    final now = DateTime.now();
+    final hh = now.hour.toString().padLeft(2, '0');
+    final mm = now.minute.toString().padLeft(2, '0');
+    if (mounted) {
+      setState(() {
+        _timeString = '$hh:$mm';
+      });
+    }
   }
 
   Future<void> _sendGpsHeartbeat() async {
@@ -87,7 +114,6 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
       double? lng;
 
       if (newStatus) {
-        // Demander/vérifier la permission GPS seulement quand on passe en service
         try {
           var permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied) {
@@ -102,9 +128,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
             lat = pos.latitude;
             lng = pos.longitude;
           }
-        } catch (_) {
-          // GPS indisponible : on met quand même à jour le statut sans coordonnées
-        }
+        } catch (_) {}
       }
 
       await ApiClient.instance.post(
@@ -122,7 +146,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
             content: Text(
               newStatus ? 'Vous êtes maintenant en service' : 'Vous êtes hors service',
             ),
-            backgroundColor: newStatus ? AppColors.success : AppColors.textTertiary,
+            backgroundColor: newStatus ? _StitchColors.primary : _StitchColors.onSurfaceVariant,
           ),
         );
       }
@@ -131,7 +155,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.message),
-            backgroundColor: AppColors.error,
+            backgroundColor: _StitchColors.tertiary,
           ),
         );
       }
@@ -140,7 +164,7 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erreur lors de la mise à jour du statut.'),
-            backgroundColor: AppColors.error,
+            backgroundColor: _StitchColors.tertiary,
           ),
         );
       }
@@ -174,8 +198,25 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
       totalRevenue: (stats?['totalRevenue'] as num?)?.toDouble() ?? 0.0,
       joinedDate: DateTime.now(),
     );
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: _StitchColors.background,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/police/scan'),
+        backgroundColor: _StitchColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        icon: const Icon(Icons.add_circle, size: 24),
+        label: Text(
+          'NOUVELLE INTERPELLATION',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           _buildAppBar(officer, _onDuty, unreadCount),
@@ -183,12 +224,13 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 _buildWelcomeBanner(officer),
                 const SizedBox(height: 24),
-                _buildStatsRow(officer, paymentRate: (stats?['paymentRate'] as num?)?.toInt()),
-                const SizedBox(height: 24),
-                _buildQuickActions(),
+                _buildStatsRow(
+                  officer,
+                  paymentRate: (stats?['paymentRate'] as num?)?.toInt(),
+                ),
                 const SizedBox(height: 24),
                 _buildActivityFeed(recentFinesAsync.valueOrNull ?? []),
                 const SizedBox(height: 24),
@@ -202,386 +244,450 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
     );
   }
 
-  Widget _buildAppBar(OfficerModel officer, bool onDuty, int unreadCount) {
-    return SliverAppBar(
-      pinned: true,
-      floating: false,
-      expandedHeight: 0,
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      titleSpacing: 16,
-      title: Row(
+  Widget _buildTopStatusBar() {
+    return Container(
+      color: _StitchColors.primary,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const PncBadge(size: 38, showGlow: false),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text('Circulation+',
-                  style: AppTextStyles.titleSmall.copyWith(color: AppColors.textPrimary)),
+              const Icon(Icons.signal_cellular_alt, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
               Text(
-                'PORTAIL AGENT — PNC',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.gold,
-                  fontSize: 9,
-                  letterSpacing: 1.5,
+                '4G+',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(Icons.location_on, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+              Text(
+                'GPS Fix',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
-          const Spacer(),
-          // En service / Hors service toggle
-          GestureDetector(
-            onTap: _statusLoading ? null : _toggleDutyStatus,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: onDuty
-                    ? AppColors.success.withValues(alpha: 0.15)
-                    : AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: onDuty
-                      ? AppColors.success.withValues(alpha: 0.4)
-                      : AppColors.cardBorder,
+          Row(
+            children: [
+              const Icon(Icons.sync, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+              Text(
+                'Cloud Sync',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
                 ),
               ),
-              child: _statusLoading
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.success,
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: onDuty
-                                ? AppColors.success
-                                : AppColors.textDisabled,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          onDuty ? 'En service' : 'Hors service',
-                          style: AppTextStyles.caption.copyWith(
-                            color: onDuty
-                                ? AppColors.success
-                                : AppColors.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          StatusBadge.fromOfficerStatus(officer.status),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => context.push('/police/notifications'),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: const Icon(Icons.notifications_outlined,
-                      size: 20, color: AppColors.textSecondary),
+              const SizedBox(width: 12),
+              Text(
+                _timeString,
+                style: GoogleFonts.courierPrime(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white,
                 ),
-                if (unreadCount > 0)
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.surface, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          unreadCount > 9 ? '9+' : '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
-      bottom: const PreferredSize(
-        preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: AppColors.divider),
+    );
+  }
+
+  Widget _buildAppBar(OfficerModel officer, bool onDuty, int unreadCount) {
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+    
+    return SliverAppBar(
+      pinned: true,
+      floating: false,
+      automaticallyImplyLeading: false,
+      toolbarHeight: 64,
+      backgroundColor: _StitchColors.surface,
+      surfaceTintColor: Colors.transparent,
+      titleSpacing: 0,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          color: _StitchColors.surface,
+          border: Border(
+            bottom: BorderSide(color: _StitchColors.outlineVariant, width: 1),
+          ),
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: statusBarHeight),
+            _buildTopStatusBar(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.security, color: _StitchColors.primary, size: 24),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Circulation+',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _StitchColors.primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _statusLoading ? null : _toggleDutyStatus,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: onDuty
+                              ? _StitchColors.primary.withOpacity(0.1)
+                              : _StitchColors.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: onDuty
+                                ? _StitchColors.primary.withOpacity(0.4)
+                                : _StitchColors.outlineVariant,
+                          ),
+                        ),
+                        child: _statusLoading
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: _StitchColors.primary,
+                                ),
+                              )
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: onDuty
+                                          ? _StitchColors.primary
+                                          : Colors.grey,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    onDuty ? 'En service' : 'Hors service',
+                                    style: GoogleFonts.inter(
+                                      color: onDuty
+                                          ? _StitchColors.primary
+                                          : _StitchColors.onSurfaceVariant,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => context.push('/police/notifications'),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(
+                            Icons.notifications_none_rounded,
+                            color: _StitchColors.onSurfaceVariant,
+                            size: 24,
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                decoration: BoxDecoration(
+                                  color: _StitchColors.tertiary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: _StitchColors.surface, width: 1.5),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    unreadCount > 9 ? '9+' : '$unreadCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => context.push('/police/settings'),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          color: _StitchColors.primaryContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            officer.avatarInitials,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildWelcomeBanner(OfficerModel officer) {
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Bonjour'
-        : hour < 18
-            ? 'Bon après-midi'
-            : 'Bonsoir';
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0D1F44), Color(0xFF0A1628), Color(0xFF0D1421)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Poste de Brazzaville Nord'.toUpperCase(),
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _StitchColors.onSurfaceVariant,
+            letterSpacing: 1.5,
+          ),
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+        const SizedBox(height: 4),
+        Text(
+          'Bonjour, Agent ${officer.lastName}',
+          style: GoogleFonts.inter(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: _StitchColors.onSurface,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting,',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textTertiary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  officer.fullName,
-                  style: AppTextStyles.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.goldGlow,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        officer.badgeNumber,
-                        style: AppTextStyles.mono.copyWith(
-                          fontSize: 11,
-                          color: AppColors.gold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      officer.rank,
-                      style: AppTextStyles.bodySmall,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textTertiary),
-                    const SizedBox(width: 4),
-                    Text(officer.zone, style: AppTextStyles.caption),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            children: [
-              UserAvatar(
-                size: 64,
-                editable: true,
-                photoUrl: ref.watch(authProvider).photoUrl,
-                initials: officer.avatarInitials,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Aujourd\'hui',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
-              ),
-              AnimatedCounter(
-                end: officer.todayInfractions,
-                style: AppTextStyles.headlineSmall.copyWith(color: AppColors.primary),
-              ),
-              Text('interpellations', style: AppTextStyles.caption),
-            ],
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2);
+        ),
+      ],
+    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1);
   }
 
   Widget _buildStatsRow(OfficerModel officer, {int? paymentRate}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Statistiques', style: AppTextStyles.titleMedium),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _StitchColors.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'TOTAL INTERPELLATIONS',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.8),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _formatNumber(officer.totalInfractions),
+                style: GoogleFonts.inter(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.trending_up,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+12% vs mois dernier',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
+        
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          childAspectRatio: 1.5,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+        
+        Row(
           children: [
-            StatCard(
-              label: 'Total Interpellations',
-              value: '${officer.totalInfractions}',
-              icon: Icons.gavel_rounded,
-              iconColor: AppColors.primary,
-              animationDelay: 0,
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _StitchColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _StitchColors.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'REVENUS (CFA)',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _StitchColors.onSurfaceVariant,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _formatRevenue(officer.totalRevenue),
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _StitchColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            StatCard(
-              label: 'Revenus générés',
-              value: officer.totalRevenue == 0
-                  ? '0'
-                  : '${(officer.totalRevenue / 1000000).toStringAsFixed(1)}M',
-              subtitle: 'FCFA',
-              icon: Icons.account_balance_wallet_outlined,
-              iconColor: AppColors.success,
-              animationDelay: 100,
-            ),
-            StatCard(
-              label: 'Ce mois',
-              value: '${officer.todayInfractions}',
-              icon: Icons.calendar_month_outlined,
-              iconColor: AppColors.warning,
-              animationDelay: 200,
-            ),
-            StatCard(
-              label: 'Taux paiement',
-              value: paymentRate == null ? '—' : '$paymentRate%',
-              icon: Icons.check_circle_outline_rounded,
-              iconColor: AppColors.success,
-              animationDelay: 300,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _StitchColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _StitchColors.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PV DU MOIS',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _StitchColors.onSurfaceVariant,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${officer.todayInfractions}',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _StitchColors.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Actions rapides', style: AppTextStyles.titleMedium),
+        ).animate().fadeIn(duration: 450.ms).slideY(begin: 0.1),
+        
         const SizedBox(height: 12),
-        GestureDetector(
-          onTap: () => context.push('/police/scan'),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
+        
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _StitchColors.secondaryContainer,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _StitchColors.secondary.withOpacity(0.1)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _StitchColors.secondary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.payments_outlined,
+                      color: _StitchColors.secondary,
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(Icons.add_circle_rounded, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
+                  const SizedBox(width: 12),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nouvelle Interpellation',
-                        style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
+                        'TAUX DE PAIEMENT',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _StitchColors.secondary,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Scanner permis · Sélectionner l\'infraction · Signer',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
+                        paymentRate == null ? '—' : '$paymentRate%',
+                        style: GoogleFonts.inter(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: _StitchColors.secondary,
                         ),
                       ),
                     ],
                   ),
+                ],
+              ),
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  value: (paymentRate ?? 88.5) / 100,
+                  strokeWidth: 4,
+                  backgroundColor: _StitchColors.secondary.withOpacity(0.2),
+                  valueColor: const AlwaysStoppedAnimation<Color>(_StitchColors.secondary),
                 ),
-                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
-              ],
-            ),
+              ),
+            ],
           ),
-        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2),
-
-        const SizedBox(height: 12),
-
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionCard(
-                icon: Icons.credit_card_rounded,
-                label: 'Vérifier\nPermis',
-                color: AppColors.gold,
-                onTap: () => context.push('/police/license-verify'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _QuickActionCard(
-                icon: Icons.search_rounded,
-                label: 'Historique\nConducteur',
-                color: AppColors.accent,
-                onTap: () => context.push('/police/history'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _QuickActionCard(
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Scanner\nPlaque',
-                color: AppColors.success,
-                onTap: () => context.push('/police/scan'),
-              ),
-            ),
-          ],
-        ).animate().fadeIn(delay: 300.ms),
+        ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1),
       ],
     );
   }
@@ -592,97 +698,170 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Activité récente', style: AppTextStyles.titleMedium),
-            const Spacer(),
+            Text(
+              'Activité Récente',
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: _StitchColors.onSurface,
+              ),
+            ),
             GestureDetector(
               onTap: () => context.go('/police/history'),
               child: Text(
                 'Voir tout',
-                style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _StitchColors.primary,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         if (recent.isEmpty)
-          PremiumCard(
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+            decoration: BoxDecoration(
+              color: _StitchColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _StitchColors.outlineVariant),
+            ),
             child: Column(
               children: [
-                const Icon(Icons.history_rounded,
-                    size: 36, color: AppColors.textDisabled),
+                const Icon(Icons.history_rounded, size: 36, color: Colors.grey),
                 const SizedBox(height: 10),
                 Text(
                   'Aucune activité pour le moment',
-                  style: AppTextStyles.bodyMedium
-                      .copyWith(color: AppColors.textTertiary),
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: _StitchColors.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Vos verbalisations apparaîtront ici.',
-                  style: AppTextStyles.bodySmall,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: _StitchColors.onSurfaceVariant.withOpacity(0.6),
+                  ),
                 ),
               ],
             ),
-          ).animate().fadeIn(delay: 400.ms)
+          ).animate().fadeIn(duration: 300.ms)
         else
           ...recent.asMap().entries.map((e) {
             final fine = e.value;
+            final isPaid = fine.status == FineStatus.paid;
+            
+            IconData leadingIcon = Icons.directions_car_outlined;
+            Color iconColor = _StitchColors.primary;
+            
+            if (fine.infractionLabel.toLowerCase().contains('casque') ||
+                fine.infractionLabel.toLowerCase().contains('moto') ||
+                fine.infractionLabel.toLowerCase().contains('deux roues')) {
+              leadingIcon = Icons.two_wheeler_outlined;
+            } else if (fine.status == FineStatus.overdue) {
+              leadingIcon = Icons.minor_crash_outlined;
+              iconColor = _StitchColors.tertiary;
+            }
+            
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: PremiumCard(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _StitchColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _StitchColors.outlineVariant),
+                ),
                 child: Row(
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        color: _StitchColors.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.gavel_rounded,
-                          size: 18, color: AppColors.primary),
+                      child: Icon(leadingIcon, color: iconColor, size: 24),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                fine.vehiclePlate,
+                                style: GoogleFonts.courierPrime(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: _StitchColors.onSurface,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isPaid
+                                      ? _StitchColors.primary.withOpacity(0.1)
+                                      : _StitchColors.errorContainer,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  isPaid ? 'PAYÉ' : 'EN ATTENTE',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPaid
+                                        ? _StitchColors.primary
+                                        : _StitchColors.onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           Text(
                             fine.infractionLabel,
-                            style: AppTextStyles.bodyMedium,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                              color: _StitchColors.onSurfaceVariant,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
-                            '${fine.vehiclePlate} · ${fine.issuedAt.day}/${fine.issuedAt.month}/${fine.issuedAt.year}',
-                            style: AppTextStyles.caption,
+                            '${fine.issuedAt.day}/${fine.issuedAt.month}/${fine.issuedAt.year} · ${fine.amount} CFA',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: _StitchColors.onSurfaceVariant.withOpacity(0.7),
+                            ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        StatusBadge.fromFineStatus(fine.status),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${(fine.amount / 1000).toStringAsFixed(0)}K',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: _StitchColors.onSurfaceVariant,
+                      size: 20,
                     ),
                   ],
                 ),
-              ).animate(delay: Duration(milliseconds: 400 + e.key * 80))
-                  .fadeIn(duration: 300.ms)
-                  .slideX(begin: 0.05, end: 0),
-            );
+              ),
+            ).animate(delay: Duration(milliseconds: 400 + e.key * 80))
+                .fadeIn(duration: 300.ms)
+                .slideX(begin: 0.05, end: 0);
           }),
       ],
     );
@@ -690,20 +869,49 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
 
   Widget _buildStatusIndicators(int pendingCount) {
     final hasPending = pendingCount > 0;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('État du système', style: AppTextStyles.titleMedium),
+        Text(
+          'État du système',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: _StitchColors.onSurface,
+          ),
+        ),
         const SizedBox(height: 12),
-        PremiumCard(
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _StitchColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _StitchColors.outlineVariant),
+          ),
           child: Column(
             children: [
-              const _StatusRow(label: 'Connexion réseau', status: true, detail: '4G LTE'),
-              const Divider(height: 20, color: AppColors.divider),
-              const _StatusRow(label: 'GPS actif', status: true, detail: 'Précision: 3m'),
-              const Divider(height: 20, color: AppColors.divider),
-              const _StatusRow(label: 'Serveur central', status: true, detail: 'En ligne'),
-              const Divider(height: 20, color: AppColors.divider),
+              _buildStatusRow(
+                label: 'Connexion réseau',
+                status: true,
+                detail: '4G LTE',
+                statusColor: _StitchColors.primary,
+              ),
+              const Divider(height: 20, color: _StitchColors.outlineVariant),
+              _buildStatusRow(
+                label: 'GPS actif',
+                status: true,
+                detail: 'Précision: 3m',
+                statusColor: _StitchColors.primary,
+              ),
+              const Divider(height: 20, color: _StitchColors.outlineVariant),
+              _buildStatusRow(
+                label: 'Serveur central',
+                status: true,
+                detail: 'En ligne',
+                statusColor: _StitchColors.primary,
+              ),
+              const Divider(height: 20, color: _StitchColors.outlineVariant),
               InkWell(
                 onTap: () async {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -716,17 +924,19 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
                         content: Text(synced > 0
                             ? '$synced PV synchronisé(s) avec succès !'
                             : 'Aucun PV à synchroniser ou réseau indisponible.'),
-                        backgroundColor: synced > 0 ? AppColors.success : AppColors.textTertiary,
+                        backgroundColor: synced > 0
+                            ? _StitchColors.primary
+                            : _StitchColors.onSurfaceVariant,
                       ),
                     );
                   }
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _StatusRow(
+                  child: _buildStatusRow(
                     label: 'Synchronisation',
                     status: !hasPending,
-                    statusColor: hasPending ? AppColors.warning : AppColors.success,
+                    statusColor: hasPending ? _StitchColors.secondary : _StitchColors.primary,
                     detail: hasPending
                         ? '$pendingCount en attente ↻'
                         : 'À jour ✓',
@@ -735,89 +945,28 @@ class _PoliceDashboardState extends ConsumerState<PoliceDashboard> {
               ),
             ],
           ),
-        ).animate().fadeIn(delay: 500.ms),
+        ).animate().fadeIn(duration: 500.ms),
       ],
     );
   }
-}
 
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.3,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusRow extends StatelessWidget {
-  final String label;
-  final bool status;
-  final String detail;
-  final Color? statusColor;
-
-  const _StatusRow({
-    required this.label,
-    required this.status,
-    required this.detail,
-    this.statusColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStatusRow({
+    required String label,
+    required bool status,
+    required String detail,
+    required Color statusColor,
+  }) {
     return Row(
       children: [
         Container(
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: statusColor ?? (status ? AppColors.success : AppColors.error),
+            color: statusColor,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (statusColor ?? (status ? AppColors.success : AppColors.error)).withValues(alpha: 0.5),
+                color: statusColor.withOpacity(0.5),
                 blurRadius: 6,
               ),
             ],
@@ -825,10 +974,47 @@ class _StatusRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary)),
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _StitchColors.onSurface,
+            ),
+          ),
         ),
-        Text(detail, style: AppTextStyles.bodySmall),
+        Text(
+          detail,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: _StitchColors.onSurfaceVariant,
+          ),
+        ),
       ],
     );
+  }
+
+  String _formatNumber(int number) {
+    final str = number.toString();
+    if (str.length <= 3) return str;
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      buffer.write(str[i]);
+      final remaining = str.length - 1 - i;
+      if (remaining > 0 && remaining % 3 == 0) {
+        buffer.write(',');
+      }
+    }
+    return buffer.toString();
+  }
+
+  String _formatRevenue(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(0)}k';
+    } else {
+      return '${amount.toStringAsFixed(0)}';
+    }
   }
 }

@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../theme/app_colors.dart';
-import '../../../../theme/app_text_styles.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../../theme/stitch_colors.dart';
 import '../../../../shared/models/interpellation_state.dart';
-import '../../../../shared/models/department_model.dart';
-import '../../../../shared/widgets/premium_button.dart';
 
+/// Design Stitch "Signature PV".
 class SignatureScreen extends ConsumerStatefulWidget {
   const SignatureScreen({super.key});
 
@@ -25,14 +24,12 @@ class _SignatureScreenState extends ConsumerState<SignatureScreen> {
     setState(() {
       _currentStroke = [details.localPosition];
       _hasSignature = true;
-      _refusedToSign = false; // Signer annule le refus
+      _refusedToSign = false;
     });
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    setState(() {
-      _currentStroke.add(details.localPosition);
-    });
+    setState(() => _currentStroke.add(details.localPosition));
   }
 
   void _onPanEnd(DragEndDetails details) {
@@ -50,376 +47,283 @@ class _SignatureScreenState extends ConsumerState<SignatureScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final interpellation = ref.watch(interpellationProvider);
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        leading: GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Signature numérique', style: AppTextStyles.titleSmall),
-            Text('Étape 6 sur 6', style: AppTextStyles.caption),
-          ],
-        ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(4),
-          child: LinearProgressIndicator(
-            value: 1.0,
-            backgroundColor: AppColors.surfaceVariant,
-            color: AppColors.primary,
-            minHeight: 3,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-
-            // ── Info légale ──────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.primaryGlow,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'La signature du conducteur confirme la réception de '
-                      'l\'avis d\'infraction. Ce document a une valeur légale.',
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(),
-
-            const SizedBox(height: 24),
-
-            // ── Résumé de l'interpellation ───────────────────────
-            _buildSummary(interpellation),
-
-            const SizedBox(height: 24),
-
-            // ── Signature agent ───────────────────────────────────
-            Text('Signature de l\'agent', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 12),
-            _buildSignaturePadFixed(),
-
-            const SizedBox(height: 20),
-
-            // ── Signature conducteur ──────────────────────────────
-            Text('Signature du conducteur', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              interpellation.driverName.isNotEmpty
-                  ? interpellation.driverName
-                  : 'Conducteur',
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: AppColors.textTertiary),
-            ),
-            const SizedBox(height: 12),
-            _buildSignaturePadInteractive(),
-
-            if (_hasSignature) ...[
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _clearSignature,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const Icon(Icons.refresh_rounded,
-                        size: 14, color: AppColors.textTertiary),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Effacer',
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textTertiary),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 20),
-
-            // ── Option refus ──────────────────────────────────────
-            _buildRefusalOption(),
-
-            const SizedBox(height: 24),
-
-            // ── Bouton principal ──────────────────────────────────
-            if (_refusedToSign)
-              PremiumButton(
-                label: 'Procéder à la saisie des documents',
-                icon: Icons.folder_open_outlined,
-                onPressed: () => context.push('/police/refusal'),
-              ).animate().fadeIn()
-            else
-              PremiumButton(
-                label: 'Valider l\'interpellation',
-                icon: Icons.check_circle_outline_rounded,
-                onPressed: _hasSignature
-                    ? () => context.push('/police/confirmation')
-                    : null,
-              ).animate().fadeIn(delay: 400.ms),
-
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummary(InterpellationState s) {
-    final total = s.totalAmount;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Column(
-        children: [
-          _SummaryRow(
-              label: 'Conducteur',
-              value: s.driverName.isNotEmpty ? s.driverName : '—'),
-          const Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(
-            label: 'Véhicule',
-            value: s.vehiclePlate.isNotEmpty
-                ? '${s.vehicleBrand} — ${s.vehiclePlate}'
-                : '—',
-          ),
-          const Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(
-            label: 'Lieu',
-            value: s.lieuPrecis.isNotEmpty
-                ? s.lieuPrecis
-                : s.departement?.label ?? '—',
-          ),
-          const Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(
-              label: 'Infractions',
-              value:
-                  '${s.selectedInfractions.length} infraction${s.selectedInfractions.length > 1 ? 's' : ''}'),
-          const Divider(height: 16, color: AppColors.divider),
-          _SummaryRow(
-            label: 'Montant',
-            value: '${_fmt(total)} FCFA',
-            valueColor: AppColors.primary,
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 100.ms);
-  }
-
-  Widget _buildSignaturePadFixed() {
-    return Container(
-      height: 64,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_rounded, size: 16, color: AppColors.success),
-            const SizedBox(width: 8),
-            Text(
-              'Signé électroniquement',
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.success),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSignaturePadInteractive() {
-    return Container(
-      height: 180,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1020),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _hasSignature
-              ? AppColors.primary.withValues(alpha: 0.5)
-              : AppColors.cardBorder,
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            if (!_hasSignature)
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.draw_outlined,
-                        size: 28, color: AppColors.textDisabled),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Signez ici',
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textDisabled),
-                    ),
-                  ],
-                ),
-              ),
-            GestureDetector(
-              onPanStart: _onPanStart,
-              onPanUpdate: _onPanUpdate,
-              onPanEnd: _onPanEnd,
-              child: CustomPaint(
-                painter: _SignaturePainter(
-                  strokes: _strokes,
-                  currentStroke: _currentStroke,
-                ),
-                size: Size.infinite,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRefusalOption() {
-    return GestureDetector(
-      onTap: () => setState(() {
-        _refusedToSign = !_refusedToSign;
-        if (_refusedToSign) _clearSignature();
-      }),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _refusedToSign
-              ? AppColors.error.withValues(alpha: 0.1)
-              : AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _refusedToSign
-                ? AppColors.error.withValues(alpha: 0.4)
-                : AppColors.cardBorder,
-          ),
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: _refusedToSign ? AppColors.error : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: _refusedToSign
-                      ? AppColors.error
-                      : AppColors.textTertiary,
-                ),
-              ),
-              child: _refusedToSign
-                  ? const Icon(Icons.check_rounded,
-                      size: 14, color: Colors.white)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Le conducteur refuse de signer',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: _refusedToSign
-                          ? AppColors.error
-                          : AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (_refusedToSign) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      '→ Saisie de documents + convocation automatique',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.error),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _fmt(int amount) {
     if (amount < 1000) return amount.toString();
     final thousands = amount ~/ 1000;
     final remainder = amount % 1000;
-    if (remainder == 0) return '$thousands 000';
-    return '$thousands ${remainder.toString().padLeft(3, '0')}';
+    if (remainder == 0) return '$thousands.000';
+    return '$thousands.${remainder.toString().padLeft(3, '0')}';
   }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? valueColor;
-  const _SummaryRow({required this.label, required this.value, this.valueColor});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-            flex: 2, child: Text(label, style: AppTextStyles.bodySmall)),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: valueColor ?? AppColors.textPrimary,
-              fontWeight: FontWeight.w500,
+    final s = ref.watch(interpellationProvider);
+    return Scaffold(
+      backgroundColor: StitchColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: const BoxDecoration(
+                color: StitchColors.surface,
+                border: Border(bottom: BorderSide(color: StitchColors.outlineVariant)),
+              ),
+              child: Row(
+                children: [
+                  IconButton(icon: const Icon(Icons.arrow_back, color: StitchColors.onSurface, size: 20), onPressed: () => context.pop()),
+                  const Icon(Icons.security, color: StitchColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Circulation+', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.primary)),
+                  const Spacer(),
+                  IconButton(icon: const Icon(Icons.more_vert, color: StitchColors.onSurface, size: 20), onPressed: () {}),
+                ],
+              ),
             ),
-            textAlign: TextAlign.right,
-          ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSummaryCard(s),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(child: _identityBox('Agent', '—')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _identityBox('Contrevenant', s.driverName.isNotEmpty ? s.driverName : '—')),
+                      ],
+                    ).animate().fadeIn(delay: 100.ms),
+
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Text('Signature Électronique', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
+                        const Spacer(),
+                        const Icon(Icons.verified_user, color: StitchColors.primary, size: 16),
+                        const SizedBox(width: 4),
+                        Text('Sécurisé', style: GoogleFonts.inter(fontSize: 11, color: StitchColors.primary, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    Text("Signature de l'Agent verbalisateur", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: StitchColors.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 128,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: StitchColors.outlineVariant, width: 2),
+                      ),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle, size: 16, color: StitchColors.primary),
+                            const SizedBox(width: 8),
+                            Text('Signé électroniquement', style: GoogleFonts.inter(fontSize: 13, color: StitchColors.primary)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Signature du Contrevenant', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: StitchColors.onSurfaceVariant)),
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _refusedToSign = !_refusedToSign;
+                            if (_refusedToSign) _clearSignature();
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: _refusedToSign ? StitchColors.onSurfaceVariant : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: _refusedToSign ? StitchColors.onSurfaceVariant : StitchColors.tertiary),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_refusedToSign ? Icons.edit : Icons.block, size: 14, color: _refusedToSign ? Colors.white : StitchColors.tertiary),
+                                const SizedBox(width: 4),
+                                Text(_refusedToSign ? 'Annuler le refus' : 'Refus de signer',
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: _refusedToSign ? Colors.white : StitchColors.tertiary)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Stack(
+                      children: [
+                        Container(
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: StitchColors.outlineVariant, width: 2),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Stack(
+                              children: [
+                                if (!_hasSignature && !_refusedToSign)
+                                  const Center(child: Icon(Icons.draw_outlined, size: 28, color: StitchColors.outlineVariant)),
+                                GestureDetector(
+                                  onPanStart: _refusedToSign ? null : _onPanStart,
+                                  onPanUpdate: _refusedToSign ? null : _onPanUpdate,
+                                  onPanEnd: _refusedToSign ? null : _onPanEnd,
+                                  child: CustomPaint(
+                                    painter: _SignaturePainter(strokes: _strokes, currentStroke: _currentStroke),
+                                    size: Size.infinite,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_refusedToSign)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: StitchColors.surfaceContainerHigh.withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.gavel, color: StitchColors.tertiary, size: 40),
+                                    const SizedBox(height: 6),
+                                    Text('LE CONTREVENANT A REFUSÉ DE SIGNER',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: StitchColors.tertiary)),
+                                    const SizedBox(height: 4),
+                                    Text('Mention portée d\'office au procès-verbal',
+                                        style: GoogleFonts.inter(fontSize: 10, color: StitchColors.onSurfaceVariant)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (_hasSignature && !_refusedToSign)
+                          Positioned(
+                            right: 4, top: 4,
+                            child: IconButton(icon: const Icon(Icons.history, size: 18, color: StitchColors.onSurfaceVariant), onPressed: _clearSignature),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: (_hasSignature || _refusedToSign)
+                            ? () => context.push(_refusedToSign ? '/police/refusal' : '/police/confirmation')
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: StitchColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('GÉNÉRER LE PV', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.assignment_turned_in, size: 18),
+                          ],
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 300.ms),
+                    const SizedBox(height: 12),
+                    Text(
+                      "En validant, un certificat numérique infalsifiable sera généré et transmis au centre de traitement national.",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(InterpellationState s) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: StitchColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: StitchColors.outlineVariant),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('RÉFÉRENCE PROVISOIRE', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: StitchColors.onSurfaceVariant)),
+          const SizedBox(height: 4),
+          Text('#PV-${s.vehiclePlate.isNotEmpty ? s.vehiclePlate : "EN-COURS"}',
+              style: GoogleFonts.courierPrime(fontSize: 16, fontWeight: FontWeight.bold, color: StitchColors.onSurface)),
+          const SizedBox(height: 12),
+          const Divider(color: StitchColors.outlineVariant),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Montant Total à Payer', style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)),
+                    Text('${_fmt(s.totalAmount)} FCFA', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: StitchColors.primary)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: StitchColors.tertiaryFixed, borderRadius: BorderRadius.circular(20)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.warning, size: 13, color: StitchColors.onTertiaryFixed),
+                    const SizedBox(width: 4),
+                    Text('Délai 15j', style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onTertiaryFixed)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms);
+  }
+
+  Widget _identityBox(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: StitchColors.surfaceContainerLow, borderRadius: BorderRadius.circular(12), border: Border.all(color: StitchColors.outlineVariant)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)),
+          const SizedBox(height: 2),
+          Text(value, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: StitchColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
     );
   }
 }
@@ -427,13 +331,12 @@ class _SummaryRow extends StatelessWidget {
 class _SignaturePainter extends CustomPainter {
   final List<List<Offset>> strokes;
   final List<Offset> currentStroke;
-
   _SignaturePainter({required this.strokes, required this.currentStroke});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.primary
+      ..color = const Color(0xFF002109)
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round

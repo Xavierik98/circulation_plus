@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
-import '../../../shared/widgets/premium_button.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../theme/stitch_colors.dart';
 import '../../../data/api_client.dart';
 import '../../../core/utils/congo_phone.dart';
 
@@ -49,135 +48,161 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor      = isDark ? AppColors.background      : const Color(0xFFF4F6FA);
-    final surfColor    = isDark ? AppColors.surface         : Colors.white;
-    final surfVarColor = isDark ? AppColors.surfaceVariant  : const Color(0xFFF1F5F9);
-    final borderColor  = isDark ? AppColors.cardBorder      : const Color(0xFFE2E8F0);
-    final textPriColor = isDark ? AppColors.textPrimary     : const Color(0xFF0F172A);
-
     return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: surfColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              size: 18, color: textPriColor),
-          onPressed: () => context.pop(),
-        ),
-        title: Text('Mot de passe oublié', style: AppTextStyles.titleMedium),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(3),
-          child: Container(
-            height: 3,
-            decoration: const BoxDecoration(gradient: AppColors.congoFlagGradient),
-          ),
-        ),
-      ),
+      backgroundColor: StitchColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: _sent
-              ? _buildSuccess()
-              : _buildForm(bgColor, surfVarColor, borderColor, textPriColor),
+        child: Column(
+          children: [
+            // TopAppBar
+            Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: const BoxDecoration(
+                color: StitchColors.surface,
+                border: Border(bottom: BorderSide(color: StitchColors.outlineVariant)),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: StitchColors.onSurface, size: 20),
+                    onPressed: () => context.pop(),
+                  ),
+                  Text('RÉCUPÉRATION',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1, color: StitchColors.onSurface)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: _sent ? _buildSuccess() : _buildForm(),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildForm(Color bgColor, Color surfVar, Color border, Color textPri) {
+  Widget _buildForm() {
     return Form(
       key: _formKey,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
-          Center(
-            child: Container(
-              width: 80, height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: const Icon(Icons.lock_reset_rounded, size: 38, color: AppColors.primary),
-            ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: StitchColors.primaryContainer, borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.security, color: Colors.white, size: 40),
           ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.8, 0.8)),
-          const SizedBox(height: 28),
-          Text('Réinitialiser votre mot de passe', style: AppTextStyles.titleLarge)
+          const SizedBox(height: 20),
+          Text('Mot de passe oublié ?',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: StitchColors.onSurface))
               .animate().fadeIn(delay: 100.ms),
           const SizedBox(height: 8),
           Text(
-            _usePhone
-                ? 'Saisissez votre numéro de téléphone. Un lien sera envoyé à votre email associé.'
-                : 'Saisissez l\'email associé à votre compte. Vous recevrez un lien valable 1 heure.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textTertiary),
+            'Veuillez choisir une méthode pour réinitialiser votre accès sécurisé au portail Circulation+.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant),
           ).animate().fadeIn(delay: 150.ms),
           const SizedBox(height: 24),
 
           // Toggle email / téléphone
           Container(
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: surfVar,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: border),
+              color: StitchColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: StitchColors.outlineVariant),
             ),
             child: Row(children: [
-              _ModeTab(label: 'Email',      icon: Icons.email_outlined,  selected: !_usePhone, onTap: () => setState(() => _usePhone = false)),
-              _ModeTab(label: 'Téléphone', icon: Icons.phone_outlined,  selected: _usePhone,  onTap: () => setState(() => _usePhone = true)),
+              _ModeTab(label: 'PAR EMAIL', icon: Icons.mail_outline, selected: !_usePhone, onTap: () => setState(() => _usePhone = false)),
+              _ModeTab(label: 'PAR SMS', icon: Icons.smartphone, selected: _usePhone, onTap: () => setState(() => _usePhone = true)),
             ]),
           ).animate().fadeIn(delay: 180.ms),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _usePhone
-                ? TextFormField(
+                ? Column(
                     key: const ValueKey('phone'),
-                    controller: _phoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: CongoPhone.inputFormatters,
-                    autofocus: true,
-                    style: AppTextStyles.bodyMedium.copyWith(color: textPri),
-                    validator: CongoPhone.validator(),
-                    decoration: const InputDecoration(
-                      labelText: 'Numéro de téléphone',
-                      hintText: '+242 06 000 0000',
-                      prefixIcon: Icon(Icons.phone_outlined, size: 20, color: AppColors.textTertiary),
-                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('NUMÉRO DE TÉLÉPHONE ENREGISTRÉ'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: CongoPhone.inputFormatters,
+                        autofocus: true,
+                        style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurface),
+                        validator: CongoPhone.validator(),
+                        decoration: _fieldDecoration(hint: '+242 06 000 0000', icon: Icons.phone_android),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Un code de vérification à 6 chiffres sera envoyé par SMS.',
+                          style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)),
+                    ],
                   )
-                : TextFormField(
+                : Column(
                     key: const ValueKey('email'),
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    autofocus: true,
-                    style: AppTextStyles.bodyMedium.copyWith(color: textPri),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email requis';
-                      if (!v.contains('@')) return 'Email invalide';
-                      return null;
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Adresse email',
-                      hintText: 'votre@email.com',
-                      prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppColors.textTertiary),
-                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('ADRESSE EMAIL OFFICIELLE'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        autofocus: true,
+                        style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurface),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Email requis';
+                          if (!v.contains('@')) return 'Email invalide';
+                          return null;
+                        },
+                        decoration: _fieldDecoration(hint: 'votre@email.com', icon: Icons.alternate_email),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Un lien de réinitialisation sera envoyé à votre adresse.',
+                          style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)),
+                    ],
                   ),
           ),
           const SizedBox(height: 28),
-          PremiumButton(
-            label: 'Envoyer le lien',
-            isLoading: _loading,
-            icon: Icons.send_rounded,
-            onPressed: _loading ? null : _submit,
-          ).animate().fadeIn(delay: 250.ms),
-          const SizedBox(height: 16),
-          Center(
-            child: TextButton(
-              onPressed: () => context.pop(),
-              child: const Text('Retour à la connexion',
-                  style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: StitchColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _loading
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_usePhone ? 'Envoyer le code par SMS' : 'Envoyer le lien de réinitialisation',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward, size: 18),
+                      ],
+                    ),
             ),
+          ).animate().fadeIn(delay: 250.ms),
+
+          const SizedBox(height: 24),
+          Text('Vous avez encore des problèmes ?', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: StitchColors.onSurfaceVariant)),
+          TextButton(
+            onPressed: () => context.pop(),
+            child: Text('Retour à la connexion', style: GoogleFonts.inter(color: StitchColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
           ),
         ],
       ),
@@ -187,48 +212,57 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget _buildSuccess() {
     final identifier = _usePhone ? _phoneCtrl.text.trim() : _emailCtrl.text.trim();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          width: 100, height: 100,
-          decoration: BoxDecoration(
-            gradient: AppColors.successGradient,
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: AppColors.success.withValues(alpha: 0.4), blurRadius: 30)],
-          ),
-          child: const Icon(Icons.mark_email_read_rounded, color: Colors.white, size: 48),
+          width: 80, height: 80,
+          decoration: const BoxDecoration(color: StitchColors.primaryContainer, shape: BoxShape.circle),
+          child: const Icon(Icons.check_circle, color: Colors.white, size: 40),
         ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.7, 0.7)),
-        const SizedBox(height: 28),
-        Text('Lien envoyé !',
-            style: AppTextStyles.headlineMedium.copyWith(color: AppColors.success))
+        const SizedBox(height: 24),
+        Text('Demande envoyée !', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: StitchColors.onSurface))
             .animate().fadeIn(delay: 200.ms),
         const SizedBox(height: 12),
         Text(
-          'Si un compte est associé à\n$identifier\nun lien de réinitialisation a été envoyé par email.',
+          'Si un compte est associé à\n$identifier\nun lien de réinitialisation a été envoyé.',
           textAlign: TextAlign.center,
-          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textTertiary),
+          style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant),
         ).animate().fadeIn(delay: 300.ms),
         const SizedBox(height: 8),
-        Text('Ce lien expire dans 1 heure.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning))
+        Text('Ce lien expire dans 1 heure.', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 12, color: StitchColors.tertiary))
             .animate().fadeIn(delay: 350.ms),
-        const SizedBox(height: 40),
+        const SizedBox(height: 32),
         SizedBox(
           width: double.infinity,
+          height: 52,
           child: OutlinedButton(
-            onPressed: () => context.go('/'),
+            onPressed: () => context.go('/role'),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primary),
+              side: const BorderSide(color: StitchColors.primary, width: 2),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: Text('Retour à la connexion',
-                style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+            child: Text('RETOUR À LA CONNEXION', style: GoogleFonts.inter(color: StitchColors.primary, fontWeight: FontWeight.w700)),
           ),
         ).animate().fadeIn(delay: 400.ms),
       ],
+    );
+  }
+
+  Widget _buildLabel(String text) => Text(
+        text,
+        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: StitchColors.onSurfaceVariant),
+      );
+
+  InputDecoration _fieldDecoration({required String hint, required IconData icon}) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: StitchColors.surface,
+      suffixIcon: Icon(icon, color: StitchColors.onSurfaceVariant, size: 20),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: StitchColors.outline)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: StitchColors.outline)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: StitchColors.primary, width: 2)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: StitchColors.error)),
     );
   }
 }
@@ -247,20 +281,21 @@ class _ModeTab extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
+            color: selected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
+            boxShadow: selected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 3)] : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16,
-                  color: selected ? AppColors.primary : AppColors.textTertiary),
+              Icon(icon, size: 16, color: selected ? StitchColors.primary : StitchColors.onSurfaceVariant),
               const SizedBox(width: 6),
-              Text(label, style: AppTextStyles.labelMedium.copyWith(
-                  color: selected ? AppColors.primary : AppColors.textTertiary,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+              Text(label, style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? StitchColors.primary : StitchColors.onSurfaceVariant)),
             ],
           ),
         ),

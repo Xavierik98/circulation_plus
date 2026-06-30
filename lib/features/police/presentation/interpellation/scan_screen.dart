@@ -6,10 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import '../../../../theme/app_colors.dart';
-import '../../../../theme/app_text_styles.dart';
-import '../../../../shared/widgets/premium_button.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../shared/models/interpellation_state.dart';
+
+class _StitchColors {
+  static const Color primary = Color(0xFF83fb9c); // or 0xFF006b2e
+  static const Color background = Colors.black;
+  static const Color surface = Colors.black;
+  static const Color textPrimary = Colors.white;
+  static const Color textSecondary = Colors.white70;
+}
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
@@ -26,8 +32,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
   
   bool _isScanning = false;
   bool _scanComplete = false;
-  String _scanType = 'license';
   String? _imagePath;
+  bool _flashOn = false;
 
   final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   bool _isBusy = false;
@@ -40,7 +46,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    // ML Kit OCR n'est pas disponible sur Flutter Web
     if (!kIsWeb) {
       _initCamera();
     }
@@ -50,7 +55,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
     try {
       _cameras = await availableCameras();
       if (_cameras.isNotEmpty) {
-        // Select back camera if available
         final backCamera = _cameras.firstWhere(
           (c) => c.lensDirection == CameraLensDirection.back,
           orElse: () => _cameras.first,
@@ -71,7 +75,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
           });
         }
         
-        // Démarrer l'analyse en flux continu
         await _cameraController!.startImageStream(_processCameraImage);
       }
     } catch (e) {
@@ -122,7 +125,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
       final recognizedText = await _textRecognizer.processImage(inputImage);
       await _parseRecognizedText(recognizedText);
     } catch (e) {
-      // Ignorer silencieusement les erreurs de flux
+      // Ignore
     } finally {
       _isBusy = false;
     }
@@ -134,16 +137,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
     String? foundLicense;
     String? foundName;
 
-    // Analyse rudimentaire du bloc de texte
     for (TextBlock block in text.blocks) {
       final line = block.text.toUpperCase();
-      
-      // Cherche un format de numéro de permis typique (Lettres et Chiffres, ex: CG-1234567, ou 8-12 chiffres purs)
       if (RegExp(r'[A-Z0-9]{8,14}').hasMatch(line) && line.contains(RegExp(r'\d'))) {
-        foundLicense = line.replaceAll(RegExp(r'[^A-Z0-9-]'), ''); // Nettoyage
+        foundLicense = line.replaceAll(RegExp(r'[^A-Z0-9-]'), '');
       }
-      
-      // Cherche le nom (heuristique basique)
       if (line.contains('NOM') || line.contains('NAME')) {
         foundName = line.replaceAll(RegExp(r'(NOM|NAME|:|;)'), '').trim();
         if (foundName.isEmpty) foundName = null;
@@ -151,13 +149,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
     }
 
     if (foundLicense != null && foundLicense.length >= 6) {
-      // Un numéro de permis potentiel a été détecté
       setState(() => _isScanning = true);
-      
       try {
         await _cameraController?.stopImageStream();
         final XFile image = await _cameraController!.takePicture();
-        
         if (!mounted) return;
         
         setState(() {
@@ -166,14 +161,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
           _isScanning = false;
         });
         
-        // Enregistrer dans le provider
         ref.read(interpellationProvider.notifier).setScanImage(image.path);
         ref.read(interpellationProvider.notifier).updateDriver(
           license: foundLicense,
           name: foundName ?? '',
         );
         
-        // Auto-navigation
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) context.push('/police/ocr');
         });
@@ -184,10 +177,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
   }
 
   Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized || _isScanning) {
-      return;
-    }
-
+    if (_cameraController == null || !_cameraController!.value.isInitialized || _isScanning) return;
     setState(() => _isScanning = true);
     try {
       final XFile image = await _cameraController!.takePicture();
@@ -197,17 +187,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
         _imagePath = image.path;
         _scanComplete = true;
       });
-      
-      // Save to provider
       ref.read(interpellationProvider.notifier).setScanImage(image.path);
       
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) context.push('/police/ocr');
+      });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur lors de la capture : $e'),
-          backgroundColor: AppColors.error,
-        ));
-      }
+      // Error handling
     } finally {
       if (mounted) setState(() => _isScanning = false);
     }
@@ -218,471 +204,190 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
     context.push('/police/ocr');
   }
 
+  void _toggleFlash() async {
+    if (_cameraController != null && _isCameraInitialized) {
+      _flashOn = !_flashOn;
+      await _cameraController!.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Sur Flutter Web, l'OCR ML Kit n'est pas disponible — afficher un écran explicatif
-    if (kIsWeb) {
-      return _buildWebUnavailableScreen(context);
-    }
+    if (kIsWeb) return _buildWebUnavailableScreen(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        leading: GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(10),
+      backgroundColor: _StitchColors.background,
+      body: Stack(
+        children: [
+          // 1. Full Screen Camera Viewport
+          Positioned.fill(
+            child: _imagePath != null
+                ? Image.file(File(_imagePath!), fit: BoxFit.cover)
+                : (_isCameraInitialized && _cameraController != null)
+                    ? FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: _cameraController!.value.previewSize?.height ?? 1,
+                          height: _cameraController!.value.previewSize?.width ?? 1,
+                          child: CameraPreview(_cameraController!),
+                        ),
+                      )
+                    : const Center(
+                        child: CircularProgressIndicator(color: _StitchColors.primary),
+                      ),
+          ),
+
+          // 2. Overlay & Scan Line
+          if (_imagePath == null && _isCameraInitialized)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _ScannerOverlayPainter(),
+              ),
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 16, color: AppColors.textPrimary),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Nouvelle Interpellation',
-                style: AppTextStyles.titleSmall),
-            Text('Étape 1 sur 5 — Numérisation',
-                style: AppTextStyles.caption),
-          ],
-        ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(4),
-          child: LinearProgressIndicator(
-            value: 0.2,
-            backgroundColor: AppColors.surfaceVariant,
-            color: AppColors.primary,
-            minHeight: 3,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-
-            // Scan type selector
-            _buildScanTypeSelector(),
-
-            const SizedBox(height: 24),
-
-            // Live Camera Viewfinder
-            _buildViewfinder(),
-
-            const SizedBox(height: 24),
-
-            // Instructions
-            _buildInstructions(),
-
-            const SizedBox(height: 24),
-
-            if (!_scanComplete) ...[
-              PremiumButton(
-                label: _isScanning ? 'Capture en cours...' : 'Prendre la photo',
-                isLoading: _isScanning,
-                icon: Icons.camera_alt_rounded,
-                onPressed: _isScanning || !_isCameraInitialized ? null : _takePicture,
-              ).animate().fadeIn(delay: 300.ms),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton.icon(
-                  onPressed: _skipScan,
-                  icon: const Icon(Icons.edit_note_rounded,
-                      size: 16, color: AppColors.textTertiary),
-                  label: Text(
-                    'Saisie manuelle sans photo',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.textTertiary),
+          
+          if (_imagePath == null && _isCameraInitialized)
+            AnimatedBuilder(
+              animation: _scanAnimController,
+              builder: (context, _) => Positioned(
+                top: MediaQuery.of(context).size.height * (0.25 + (_scanAnimController.value * 0.40)),
+                left: MediaQuery.of(context).size.width * 0.1,
+                right: MediaQuery.of(context).size.width * 0.1,
+                child: Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: _StitchColors.primary,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _StitchColors.primary.withOpacity(0.6),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      )
+                    ],
                   ),
                 ),
-              ).animate().fadeIn(delay: 400.ms),
-            ] else
-              Column(
+              ),
+            ),
+
+          if (_imagePath != null)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.3),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.greenAccent,
+                    size: 80,
+                  ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
+                ),
+              ),
+            ),
+
+          // 3. Top AppBar
+          Positioned(
+            top: MediaQuery.of(context).padding.top,
+            left: 0,
+            right: 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: AppColors.success.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded,
-                            color: AppColors.success, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Photo capturée — vérifiez les champs sur l\'écran suivant',
-                            style: AppTextStyles.bodyMedium
-                                .copyWith(color: AppColors.success),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().scale(begin: const Offset(0.8, 0.8)),
-                  const SizedBox(height: 12),
-                  // Retake
-                  TextButton.icon(
-                    onPressed: () => setState(() {
-                      _scanComplete = false;
-                      _imagePath = null;
-                    }),
-                    icon: const Icon(Icons.refresh_rounded,
-                        size: 16, color: AppColors.textTertiary),
-                    label: Text('Reprendre la photo',
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.textTertiary)),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => context.pop(),
                   ),
-                  const SizedBox(height: 8),
-                  PremiumButton(
-                    label: 'Continuer',
-                    icon: Icons.arrow_forward_rounded,
-                    onPressed: () => context.push('/police/ocr'),
-                  ).animate().fadeIn(),
+                  Text(
+                    'Scan Permis',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _flashOn ? Icons.flash_on : Icons.flash_off,
+                      color: _flashOn ? _StitchColors.primary : Colors.white,
+                    ),
+                    onPressed: _toggleFlash,
+                  ),
                 ],
               ),
+            ),
+          ),
 
-            const SizedBox(height: 32),
-          ],
-        ),
+          // 4. Bottom Controls (kept for functionality even if not strictly in mockup)
+          if (_imagePath == null)
+            Positioned(
+              bottom: 40,
+              left: 20,
+              right: 20,
+              child: Column(
+                children: [
+                  Text(
+                    _isScanning ? 'Analyse...' : 'Placez le permis dans le cadre',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                  ).animate().fadeIn(),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: _isScanning || !_isCameraInitialized ? null : _takePicture,
+                    icon: const Icon(Icons.camera_alt),
+                    label: Text(_isScanning ? 'Capture en cours...' : 'Prendre la photo'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _StitchColors.primary,
+                      foregroundColor: Colors.black87,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _skipScan,
+                    child: Text(
+                      'Saisie manuelle sans photo',
+                      style: GoogleFonts.inter(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  // ── Écran affiché sur Flutter Web (OCR non disponible) ───────────────────
   Widget _buildWebUnavailableScreen(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        leading: GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 16, color: AppColors.textPrimary),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Nouvelle Interpellation', style: AppTextStyles.titleSmall),
-            Text('Étape 1 sur 5 — Numérisation', style: AppTextStyles.caption),
-          ],
-        ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(4),
-          child: LinearProgressIndicator(
-            value: 0.2,
-            backgroundColor: AppColors.surfaceVariant,
-            color: AppColors.primary,
-            minHeight: 3,
-          ),
-        ),
-      ),
+      backgroundColor: Colors.black,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.3)),
-                ),
-                child: const Icon(Icons.smartphone_rounded,
-                    color: AppColors.warning, size: 40),
-              ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
+              const Icon(Icons.smartphone, color: Colors.white54, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'Scanner OCR non disponible sur le Web',
+                style: GoogleFonts.inter(fontSize: 18, color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
-              Text(
-                'Scanner OCR — Application Mobile',
-                style: AppTextStyles.titleMedium,
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 200.ms),
-              const SizedBox(height: 12),
-              Text(
-                'Le scanner de permis par Intelligence Artificielle '
-                'utilise Google ML Kit, disponible uniquement sur '
-                'l\'application mobile Android/iOS installée sur le téléphone.',
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 300.ms),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 16, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Sur navigateur web, utilisez la saisie manuelle pour compléter l\'interpellation.',
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 400.ms),
-              const SizedBox(height: 32),
-              PremiumButton(
-                label: 'Continuer en saisie manuelle',
-                icon: Icons.edit_note_rounded,
+              ElevatedButton(
                 onPressed: _skipScan,
-              ).animate().fadeIn(delay: 500.ms),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScanTypeSelector() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          _ScanTypeBtn(
-            label: 'Permis de conduire',
-            icon: Icons.credit_card_rounded,
-            isSelected: _scanType == 'license',
-            onTap: () => setState(() => _scanType = 'license'),
-          ),
-          _ScanTypeBtn(
-            label: 'Carte grise',
-            icon: Icons.directions_car_rounded,
-            isSelected: _scanType == 'registration',
-            onTap: () => setState(() => _scanType = 'registration'),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 400.ms);
-  }
-
-  Widget _buildViewfinder() {
-    return Container(
-      height: 300,
-      decoration: BoxDecoration(
-        color: const Color(0xFF040D07),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.1),
-            blurRadius: 20,
-            spreadRadius: -5,
-          )
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // 1. Camera Preview or Captured Image
-            if (_imagePath != null)
-              Positioned.fill(
-                child: kIsWeb
-                    ? Container(color: AppColors.surfaceVariant)
-                    : Image.file(File(_imagePath!), fit: BoxFit.cover),
-              )
-            else if (_isCameraInitialized && _cameraController != null)
-              Positioned.fill(
-                // Use a fitted box to cover the container with the camera aspect ratio
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _cameraController!.value.previewSize?.height ?? 1,
-                    height: _cameraController!.value.previewSize?.width ?? 1,
-                    child: CameraPreview(_cameraController!),
-                  ),
-                ),
-              )
-            else
-              const Center(
-                child: CircularProgressIndicator(color: AppColors.gold),
-              ),
-
-            // 2. Dark Overlay with Cutout Mask
-            if (_imagePath == null && _isCameraInitialized)
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _ScannerOverlayPainter(),
-                ),
-              ),
-
-            // 3. Animated Scanning Line (only when live)
-            if (_imagePath == null && _isCameraInitialized)
-              Positioned(
-                top: 0,
-                bottom: 0,
-                left: 30,
-                right: 30,
-                child: AnimatedBuilder(
-                  animation: _scanAnimController,
-                  builder: (context, _) => Positioned(
-                    top: _scanAnimController.value * 260 + 20,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 3,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            AppColors.gold.withValues(alpha: 0.9),
-                            Colors.transparent,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.gold.withValues(alpha: 0.5),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-            // Overlay vert + icône check sur photo capturée
-            if (_imagePath != null)
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.check_circle_rounded,
-                      color: AppColors.success.withValues(alpha: 0.9),
-                      size: 64,
-                    ),
-                  ),
-                ),
-              ),
-
-            // Label statut bas
-            Positioned(
-              bottom: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.background.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _scanComplete
-                      ? 'Document numérisé ✓'
-                      : _isScanning
-                          ? 'Capture en cours...'
-                          : 'Alignez le document dans le cadre',
-                  style: AppTextStyles.caption.copyWith(
-                    color: _scanComplete
-                        ? AppColors.success
-                        : AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInstructions() {
-    final tips = [
-      'Placez le document bien à plat',
-      'Assurez-vous qu\'il n\'y ait pas de reflet',
-      'Laissez l\'application faire la mise au point',
-    ];
-    return Column(
-      children: tips
-          .map((tip) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 14, color: AppColors.textTertiary),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(tip, style: AppTextStyles.bodySmall)),
-                  ],
-                ),
-              ))
-          .toList(),
-    ).animate().fadeIn(delay: 400.ms);
-  }
-}
-
-class _ScanTypeBtn extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _ScanTypeBtn({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 16,
-                  color: isSelected ? Colors.white : AppColors.textTertiary),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: isSelected ? Colors.white : AppColors.textTertiary,
-                ),
+                child: const Text('Continuer en saisie manuelle'),
               ),
             ],
           ),
@@ -695,36 +400,32 @@ class _ScanTypeBtn extends StatelessWidget {
 class _ScannerOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw the semi-transparent dark overlay over the whole view
     final backgroundPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.65)
+      ..color = Colors.black.withOpacity(0.65)
       ..style = PaintingStyle.fill;
     
-    // The cutout rect represents a typical ID card ratio
-    final rectWidth = size.width * 0.85;
-    final rectHeight = rectWidth * 0.65; // ~ID card ratio
-    final cutoutRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2),
-      width: rectWidth,
-      height: rectHeight,
+    // As per Stitch CSS: top 25%, bottom 35%, left/right 10%
+    final cutoutRect = Rect.fromLTRB(
+      size.width * 0.1,
+      size.height * 0.25,
+      size.width * 0.9,
+      size.height * 0.65,
     );
     final cutoutRRect = RRect.fromRectAndRadius(cutoutRect, const Radius.circular(12));
 
-    // We use Path.combine to subtract the cutout from the full background
     final bgPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
     final cutoutPath = Path()..addRRect(cutoutRRect);
     final finalPath = Path.combine(PathOperation.difference, bgPath, cutoutPath);
     
     canvas.drawPath(finalPath, backgroundPaint);
 
-    // 2. Draw the golden corner brackets
     final bracketPaint = Paint()
-      ..color = AppColors.gold
+      ..color = const Color(0xFF83fb9c) // from Stitch theme: primary-fixed / ocr-active
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
+      ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round;
 
-    final double cornerLength = 25.0;
+    final double cornerLength = 32.0;
     
     // Top-Left
     canvas.drawLine(cutoutRect.topLeft, cutoutRect.topLeft + Offset(cornerLength, 0), bracketPaint);

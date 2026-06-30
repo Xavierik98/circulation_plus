@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../theme/app_colors.dart';
-import '../../../../theme/app_text_styles.dart';
-import '../../../../shared/widgets/premium_button.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../../theme/stitch_colors.dart';
 import '../../../../shared/models/interpellation_state.dart';
 import '../../../../shared/models/fine_model.dart';
 import '../../../../shared/services/pdf_service.dart';
@@ -176,7 +175,7 @@ class _InterpellationConfirmationScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('⚠️ Mode hors-ligne : PV enregistré localement et sera synchronisé dès le retour du réseau.'),
-          backgroundColor: AppColors.warning,
+          backgroundColor: StitchColors.secondary,
           duration: Duration(seconds: 5),
         ),
       );
@@ -200,7 +199,7 @@ class _InterpellationConfirmationScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur PDF : $e'),
-            backgroundColor: AppColors.error,
+            backgroundColor: StitchColors.error,
           ),
         );
       }
@@ -219,17 +218,16 @@ class _InterpellationConfirmationScreenState
     // ── Loading / Error ──────────────────────────────────────────────────────
     if (_isSubmitting) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: StitchColors.background,
         body: SafeArea(
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(color: AppColors.primary),
+                const CircularProgressIndicator(color: StitchColors.primary),
                 const SizedBox(height: 24),
                 Text('Enregistrement du PV…',
-                    style: AppTextStyles.titleSmall
-                        .copyWith(color: AppColors.textTertiary)),
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant)),
               ],
             ),
           ),
@@ -239,7 +237,7 @@ class _InterpellationConfirmationScreenState
 
     if (_submitError) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: StitchColors.background,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -247,27 +245,36 @@ class _InterpellationConfirmationScreenState
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.wifi_off_rounded,
-                    size: 56, color: AppColors.error),
+                    size: 56, color: StitchColors.error),
                 const SizedBox(height: 20),
                 Text('Échec de l\'enregistrement',
-                    style: AppTextStyles.titleMedium),
+                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
                 const SizedBox(height: 8),
                 Text(
                   _submitErrorMsg ?? 'Une erreur est survenue.',
-                  style: AppTextStyles.bodySmall,
+                  style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 28),
-                PremiumButton(
-                  label: 'Réessayer',
-                  icon: Icons.refresh_rounded,
-                  onPressed: _submitPv,
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _submitPv,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text('Réessayer', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: StitchColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => context.go('/police'),
                   child: const Text('Abandonner',
-                      style: TextStyle(color: AppColors.textTertiary)),
+                      style: TextStyle(color: StitchColors.onSurfaceVariant)),
                 ),
               ],
             ),
@@ -282,7 +289,7 @@ class _InterpellationConfirmationScreenState
         : 'PV-${DateTime.now().year}-${_refSuffix()}';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: StitchColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -299,7 +306,7 @@ class _InterpellationConfirmationScreenState
                 isRefusal
                     ? 'Refus enregistré\nConvocation émise'
                     : 'Interpellation\nenregistrée',
-                style: AppTextStyles.displaySmall.copyWith(height: 1.2),
+                style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, height: 1.2, color: StitchColors.onSurface),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
 
@@ -309,8 +316,7 @@ class _InterpellationConfirmationScreenState
                 isRefusal
                     ? 'Les documents saisis sont consignés dans le PV.\nUne convocation a été générée sous 7 jours.'
                     : 'L\'amende a été émise et le conducteur\na été notifié.',
-                style: AppTextStyles.bodyLarge
-                    .copyWith(color: AppColors.textTertiary),
+                style: GoogleFonts.inter(fontSize: 16, color: StitchColors.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 800.ms),
 
@@ -320,46 +326,46 @@ class _InterpellationConfirmationScreenState
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: AppColors.cardBackground,
+                  color: StitchColors.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: StitchColors.outlineVariant),
                 ),
                 child: Column(
                   children: [
                     _ConfirmRow(label: 'Référence', value: mainRef),
-                    const Divider(height: 20, color: AppColors.divider),
+                    const Divider(height: 20, color: StitchColors.outlineVariant),
                     _ConfirmRow(
                       label: 'Conducteur',
                       value: interp.driverName.isNotEmpty
                           ? interp.driverName
                           : '—',
                     ),
-                    const Divider(height: 20, color: AppColors.divider),
+                    const Divider(height: 20, color: StitchColors.outlineVariant),
                     _ConfirmRow(
                       label: 'Véhicule',
                       value: interp.vehiclePlate.isNotEmpty
                           ? '${interp.vehicleBrand} — ${interp.vehiclePlate}'
                           : '—',
                     ),
-                    const Divider(height: 20, color: AppColors.divider),
+                    const Divider(height: 20, color: StitchColors.outlineVariant),
                     _ConfirmRow(
                       label: 'PV créé(s)',
                       value:
                           '${_createdFines.isNotEmpty ? _createdFines.length : interp.selectedInfractions.length} PV',
                     ),
-                    const Divider(height: 20, color: AppColors.divider),
+                    const Divider(height: 20, color: StitchColors.outlineVariant),
                     _ConfirmRow(
                       label: 'Montant total',
                       value: '$formattedTotal FCFA',
-                      valueColor: AppColors.primary,
+                      valueColor: StitchColors.primary,
                     ),
-                    const Divider(height: 20, color: AppColors.divider),
+                    const Divider(height: 20, color: StitchColors.outlineVariant),
                     const _ConfirmRow(label: 'Délai', value: '30 jours'),
-                    const Divider(height: 20, color: AppColors.divider),
+                    const Divider(height: 20, color: StitchColors.outlineVariant),
                     _ConfirmRow(
                       label: 'Horodatage',
                       value: _formatNow(),
-                      valueStyle: AppTextStyles.mono.copyWith(fontSize: 12),
+                      valueStyle: GoogleFonts.courierPrime(fontSize: 12, color: StitchColors.onSurface),
                     ),
                   ],
                 ),
@@ -373,10 +379,10 @@ class _InterpellationConfirmationScreenState
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.08),
+                    color: StitchColors.secondary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.3)),
+                        color: StitchColors.secondary.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,12 +390,11 @@ class _InterpellationConfirmationScreenState
                       Row(
                         children: [
                           const Icon(Icons.folder_open_outlined,
-                              size: 16, color: AppColors.warning),
+                              size: 16, color: StitchColors.secondary),
                           const SizedBox(width: 8),
                           Text(
                             '${interp.documentsSeizes.length} document(s) saisi(s)',
-                            style: AppTextStyles.labelSmall
-                                .copyWith(color: AppColors.warning),
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: StitchColors.secondary),
                           ),
                         ],
                       ),
@@ -397,8 +402,7 @@ class _InterpellationConfirmationScreenState
                       ...interp.documentsSeizes.map((d) => Padding(
                             padding: const EdgeInsets.only(bottom: 2),
                             child: Text('• ${d.label}',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.textSecondary)),
+                                style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)),
                           )),
                     ],
                   ),
@@ -408,21 +412,20 @@ class _InterpellationConfirmationScreenState
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
+                    color: StitchColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3)),
+                        color: StitchColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.notifications_active_outlined,
-                          size: 18, color: AppColors.success),
+                          size: 18, color: StitchColors.primary),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'SMS + notification envoyés au conducteur',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.success),
+                          style: GoogleFonts.inter(fontSize: 12, color: StitchColors.primary),
                         ),
                       ),
                     ],
@@ -435,32 +438,46 @@ class _InterpellationConfirmationScreenState
               Row(
                 children: [
                   Expanded(
-                    child: GhostButton(
-                      label: _isPdfLoading ? 'PDF...' : 'Imprimer PDF',
-                      icon: _isPdfLoading
-                          ? Icons.hourglass_bottom_rounded
-                          : Icons.picture_as_pdf_outlined,
-                      onPressed: _isPdfLoading
-                          ? null
-                          : () => _printPdf(
-                                interp,
-                                _createdFines.isNotEmpty
-                                    ? _createdFines.first.reference
-                                    : 'PV-${DateTime.now().year}-${_refSuffix()}',
-                              ),
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: _isPdfLoading
+                            ? null
+                            : () => _printPdf(
+                                  interp,
+                                  _createdFines.isNotEmpty
+                                      ? _createdFines.first.reference
+                                      : 'PV-${DateTime.now().year}-${_refSuffix()}',
+                                ),
+                        icon: Icon(_isPdfLoading ? Icons.hourglass_bottom_rounded : Icons.picture_as_pdf_outlined, size: 18),
+                        label: Text(_isPdfLoading ? 'PDF...' : 'Imprimer PDF', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: StitchColors.primary,
+                          side: const BorderSide(color: StitchColors.primary),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 2,
-                    child: PremiumButton(
-                      label: 'Nouvelle interpellation',
-                      icon: Icons.add_rounded,
-                      onPressed: () {
-                        ref.read(interpellationProvider.notifier).reset();
-                        ref.read(selectedInfractionsProvider.notifier).state = [];
-                        context.go('/police');
-                      },
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ref.read(interpellationProvider.notifier).reset();
+                          ref.read(selectedInfractionsProvider.notifier).state = [];
+                          context.go('/police');
+                        },
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: Text('Nouvelle interpellation', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: StitchColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -478,7 +495,7 @@ class _InterpellationConfirmationScreenState
                 icon: const Icon(Icons.dashboard_outlined, size: 16),
                 label: const Text('Retour au tableau de bord'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textTertiary,
+                  foregroundColor: StitchColors.onSurfaceVariant,
                 ),
               ).animate().fadeIn(delay: 1300.ms),
 
@@ -502,7 +519,7 @@ class _InterpellationConfirmationScreenState
               height: 120 + _checkController.value * 20,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.success
+                color: StitchColors.primary
                     .withValues(alpha: 0.05 * (1 - _checkController.value)),
               ),
             ),
@@ -511,9 +528,9 @@ class _InterpellationConfirmationScreenState
               height: 110,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.success.withValues(alpha: 0.1),
+                color: StitchColors.primary.withValues(alpha: 0.1),
                 border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.3),
+                    color: StitchColors.primary.withValues(alpha: 0.3),
                     width: 1.5),
               ),
             ),
@@ -522,10 +539,10 @@ class _InterpellationConfirmationScreenState
               height: 88,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: AppColors.successGradient,
+                gradient: const LinearGradient(colors: [StitchColors.primary, StitchColors.primaryContainer]),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.success.withValues(alpha: 0.4),
+                    color: StitchColors.primary.withValues(alpha: 0.4),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
@@ -586,14 +603,16 @@ class _ConfirmRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-            flex: 2, child: Text(label, style: AppTextStyles.bodySmall)),
+            flex: 2,
+            child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant))),
         Expanded(
           flex: 3,
           child: Text(
             value,
             style: valueStyle ??
-                AppTextStyles.bodyMedium.copyWith(
-                  color: valueColor ?? AppColors.textPrimary,
+                GoogleFonts.inter(
+                  fontSize: 14,
+                  color: valueColor ?? StitchColors.onSurface,
                   fontWeight: FontWeight.w500,
                 ),
             textAlign: TextAlign.right,

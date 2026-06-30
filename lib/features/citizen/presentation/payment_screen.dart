@@ -3,10 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../theme/stitch_colors.dart';
 import '../../../shared/models/fine_model.dart';
-import '../../../shared/widgets/premium_button.dart';
 import '../../../shared/widgets/date_input_field.dart';
 import '../../../data/repositories.dart';
 import '../../../data/api_client.dart';
@@ -165,12 +164,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: StitchColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Paiement Mobile Money', style: AppTextStyles.titleMedium),
+        title: Text('Paiement Mobile Money', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
         content: Text(
           'Validez le paiement USSD sur votre téléphone, puis revenez ici.',
-          style: AppTextStyles.bodyMedium,
+          style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant),
         ),
         actions: [
           TextButton(
@@ -180,14 +179,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               context.go('/citizen');
             },
             child: const Text('J\'ai payé',
-                style: TextStyle(color: AppColors.primary)),
+                style: TextStyle(color: StitchColors.primary)),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
             },
             child: const Text('Annuler',
-                style: TextStyle(color: AppColors.textTertiary)),
+                style: TextStyle(color: StitchColors.onSurfaceVariant)),
           ),
         ],
       ),
@@ -197,7 +196,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: AppColors.error,
+      backgroundColor: StitchColors.error,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ));
@@ -211,15 +210,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     if (_paymentSuccess) return _buildSuccessScreen();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: StitchColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: StitchColors.surface,
         leading: GestureDetector(
           onTap: () => context.pop(),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
+                color: StitchColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(10)),
             child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
           ),
@@ -227,11 +226,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Paiement sécurisé', style: AppTextStyles.titleSmall),
+            Text('Paiement sécurisé', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
             Text(
               'PORTAIL CITOYEN',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.congoGreen, fontSize: 9, letterSpacing: 1.5),
+              style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant).copyWith(
+                  color: StitchColors.primary, fontSize: 9, letterSpacing: 1.5),
             ),
           ],
         ),
@@ -240,15 +239,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           child: Container(
               height: 3,
               decoration:
-                  const BoxDecoration(gradient: AppColors.congoFlagGradient)),
+                  const BoxDecoration(gradient: StitchColors.congoFlagGradient)),
         ),
       ),
       body: asyncFine.when(
         loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.primary)),
+            child: CircularProgressIndicator(color: StitchColors.primary)),
         error: (e, _) => Center(
           child: Text('Impossible de charger l\'amende : $e',
-              style: AppTextStyles.bodyMedium,
+              style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant),
               textAlign: TextAlign.center),
         ),
         data: (fine) => _buildPaymentBody(context, fine, method),
@@ -272,12 +271,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             const SizedBox(height: 24),
 
             // ── Titre méthode ────────────────────────────────────
-            Text('Méthode de paiement', style: AppTextStyles.titleMedium),
+            Text('Méthode de paiement', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
             const SizedBox(height: 4),
             Text(
               'Choisissez comment régler votre amende.',
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: AppColors.textTertiary),
+              style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                  .copyWith(color: StitchColors.onSurfaceVariant),
             ),
             const SizedBox(height: 14),
 
@@ -318,7 +317,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               id: 'tresor',
               name: 'Trésor Public',
               logoText: 'TRÉSOR',
-              logoColor: AppColors.gold,
+              logoColor: StitchColors.secondary,
               logoBg: const Color(0xFF1A1200),
               subtitle: 'Paiement en agence — quittance officielle',
               icon: Icons.account_balance_rounded,
@@ -341,15 +340,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.07),
+                color: StitchColors.primary.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.2)),
+                    color: StitchColors.primary.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.verified_outlined,
-                      size: 16, color: AppColors.success),
+                      size: 16, color: StitchColors.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -358,8 +357,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                               'Conservez l\'original pour la restitution de vos documents.'
                           : 'Vous serez redirigé vers la page de paiement Mobile Money. '
                               'Confirmez ensuite le paiement USSD sur votre téléphone.',
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textSecondary),
+                      style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                          .copyWith(color: StitchColors.onSurfaceVariant),
                     ),
                   ),
                 ],
@@ -368,24 +367,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
             const SizedBox(height: 28),
 
-            PremiumButton(
-              label: _isProcessing
-                  ? 'Traitement en cours...'
-                  : method == 'tresor'
-                      ? 'Enregistrer le paiement Trésor'
-                      : 'Payer avec ${method.toUpperCase()}',
-              isLoading: _isProcessing,
-              icon: method == 'tresor'
-                  ? Icons.account_balance_rounded
-                  : Icons.open_in_new_rounded,
-              gradient: method == 'tresor'
-                  ? const LinearGradient(
-                      colors: [Color(0xFF92400E), Color(0xFFB45309)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    )
-                  : null,
-              onPressed: _isProcessing ? null : _processPayment,
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: _isProcessing ? null : _processPayment,
+                icon: _isProcessing
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Icon(method == 'tresor' ? Icons.account_balance_rounded : Icons.open_in_new_rounded),
+                label: Text(
+                  _isProcessing
+                      ? 'Traitement en cours...'
+                      : method == 'tresor'
+                          ? 'Enregistrer le paiement Trésor'
+                          : 'Payer avec ${method.toUpperCase()}',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: method == 'tresor' ? StitchColors.secondary : StitchColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             ).animate().fadeIn(delay: 400.ms),
 
             const SizedBox(height: 32),
@@ -405,10 +408,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        border: Border.all(color: StitchColors.primary.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.12),
+            color: StitchColors.primary.withValues(alpha: 0.12),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -421,31 +424,31 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Amende à régler',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.textTertiary)),
+                    style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                        .copyWith(color: StitchColors.onSurfaceVariant)),
                 const SizedBox(height: 6),
                 Text(fine.infractionLabel,
-                    style: AppTextStyles.bodyMedium
-                        .copyWith(color: AppColors.textPrimary)),
+                    style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant)
+                        .copyWith(color: StitchColors.onSurface)),
                 const SizedBox(height: 2),
                 Text(fine.reference,
-                    style: AppTextStyles.mono
-                        .copyWith(fontSize: 11, color: AppColors.textTertiary)),
+                    style: GoogleFonts.courierPrime(fontSize: 13, color: StitchColors.onSurface)
+                        .copyWith(fontSize: 11, color: StitchColors.onSurfaceVariant)),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Total', style: AppTextStyles.caption),
+              Text('Total', style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)),
               Text(
                 _fmt(fine.amount),
-                style: AppTextStyles.headlineSmall
-                    .copyWith(color: AppColors.primary),
+                style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: StitchColors.onSurface)
+                    .copyWith(color: StitchColors.primary),
               ),
               Text('FCFA',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.primary)),
+                  style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                      .copyWith(color: StitchColors.primary)),
             ],
           ),
         ],
@@ -460,14 +463,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Numéro Mobile Money', style: AppTextStyles.titleMedium),
+        Text('Numéro Mobile Money', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
           inputFormatters: CongoPhone.inputFormatters,
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: AppColors.textPrimary),
+          style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant)
+              .copyWith(color: StitchColors.onSurface),
           decoration: InputDecoration(
             prefixIcon:
                 Icon(Icons.phone_rounded, color: color, size: 20),
@@ -479,7 +482,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           'Vous serez redirigé vers la page de paiement ${method.toUpperCase()}. '
           'Confirmez l\'USSD, puis revenez dans l\'application.',
           style:
-              AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+              GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant).copyWith(color: StitchColors.onSurfaceVariant),
         ),
       ],
     );
@@ -494,22 +497,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.gold.withValues(alpha: 0.08),
+            color: StitchColors.secondary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+            border: Border.all(color: StitchColors.secondary.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
               const Icon(Icons.info_outline_rounded,
-                  color: AppColors.gold, size: 18),
+                  color: StitchColors.secondary, size: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Rendez-vous dans une agence du Trésor public muni de votre '
                   'PV de contravention. Obtenez votre quittance officielle, '
                   'puis saisissez son numéro ci-dessous.',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.textSecondary),
+                  style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                      .copyWith(color: StitchColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -519,15 +522,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         const SizedBox(height: 16),
 
         // Numéro quittance
-        Text('Numéro de quittance *', style: AppTextStyles.labelMedium),
+        Text('Numéro de quittance *', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _quittanceController,
           textCapitalization: TextCapitalization.characters,
-          style: AppTextStyles.mono.copyWith(color: AppColors.textPrimary),
+          style: GoogleFonts.courierPrime(fontSize: 13, color: StitchColors.onSurface).copyWith(color: StitchColors.onSurface),
           decoration: const InputDecoration(
             prefixIcon: Icon(Icons.receipt_long_outlined,
-                color: AppColors.gold, size: 20),
+                color: StitchColors.secondary, size: 20),
             hintText: 'Ex : QTT-2026-00012345',
           ),
         ).animate().fadeIn(delay: 50.ms),
@@ -535,14 +538,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         const SizedBox(height: 14),
 
         // Date de paiement
-        Text('Date du paiement', style: AppTextStyles.labelMedium),
+        Text('Date du paiement', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant)),
         const SizedBox(height: 8),
         DateInputField(
           initialValue: _quittanceDate,
           firstDate: DateTime.now().subtract(const Duration(days: 365)),
           lastDate: DateTime.now(),
           label: 'Date du paiement',
-          iconColor: AppColors.gold,
+          iconColor: StitchColors.secondary,
           helpText: 'Date du paiement',
           onChanged: (d) => setState(() => _quittanceDate = d),
         ).animate().fadeIn(delay: 100.ms),
@@ -550,16 +553,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         const SizedBox(height: 14),
 
         // Agent caisse
-        Text('Nom de l\'agent à la caisse', style: AppTextStyles.labelMedium),
+        Text('Nom de l\'agent à la caisse', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _agentTresorController,
           textCapitalization: TextCapitalization.words,
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: AppColors.textPrimary),
+          style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant)
+              .copyWith(color: StitchColors.onSurface),
           decoration: const InputDecoration(
             prefixIcon: Icon(Icons.person_outline_rounded,
-                color: AppColors.gold, size: 20),
+                color: StitchColors.secondary, size: 20),
             hintText: 'Nom de l\'agent à la caisse (optionnel)',
           ),
         ).animate().fadeIn(delay: 150.ms),
@@ -570,22 +573,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.warning.withValues(alpha: 0.08),
+            color: StitchColors.secondary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
             border:
-                Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                Border.all(color: StitchColors.secondary.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
               const Icon(Icons.folder_open_outlined,
-                  color: AppColors.warning, size: 16),
+                  color: StitchColors.secondary, size: 16),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'La restitution de vos documents saisis interviendra '
                   'après vérification du paiement par l\'administration PNC.',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.textSecondary),
+                  style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                      .copyWith(color: StitchColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -599,7 +602,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _buildSuccessScreen() {
     final method = ref.read(_selectedMethodProvider);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: StitchColors.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -616,7 +619,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                       height: 120 + _successController.value * 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.success.withValues(
+                        color: StitchColors.primary.withValues(
                             alpha: 0.05 * (1 - _successController.value)),
                       ),
                     ),
@@ -625,10 +628,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                       height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: AppColors.successGradient,
+                        gradient: const LinearGradient(colors: [StitchColors.primary, StitchColors.primaryContainer]),
                         boxShadow: [
                           BoxShadow(
-                              color: AppColors.success.withValues(alpha: 0.4),
+                              color: StitchColors.primary.withValues(alpha: 0.4),
                               blurRadius: 30)
                         ],
                       ),
@@ -643,7 +646,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               ),
               const SizedBox(height: 32),
               Text('Paiement enregistré !',
-                      style: AppTextStyles.headlineMedium)
+                      style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.bold, color: StitchColors.onSurface))
                   .animate()
                   .fadeIn(delay: 500.ms),
               const SizedBox(height: 12),
@@ -653,15 +656,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                         'La restitution des documents interviendra sous 48h.'
                     : 'Paiement Mobile Money en cours de confirmation.\n'
                         'Vous recevrez une notification.',
-                style: AppTextStyles.bodyLarge
-                    .copyWith(color: AppColors.textTertiary),
+                style: GoogleFonts.inter(fontSize: 16, color: StitchColors.onSurfaceVariant)
+                    .copyWith(color: StitchColors.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 700.ms),
               const SizedBox(height: 32),
               const CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor:
-                    AlwaysStoppedAnimation<Color>(AppColors.success),
+                    AlwaysStoppedAnimation<Color>(StitchColors.primary),
               ).animate().fadeIn(delay: 900.ms),
             ],
           ),
@@ -712,10 +715,10 @@ class _PaymentMethodCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? logoColor.withValues(alpha: 0.06)
-              : AppColors.cardBackground,
+              : StitchColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? logoColor : AppColors.cardBorder,
+            color: isSelected ? logoColor : StitchColors.outlineVariant,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -749,11 +752,11 @@ class _PaymentMethodCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: AppTextStyles.titleSmall),
+                  Text(name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
                   const SizedBox(height: 2),
                   Text(subtitle,
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textTertiary)),
+                      style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)
+                          .copyWith(color: StitchColors.onSurfaceVariant)),
                 ],
               ),
             ),
@@ -765,7 +768,7 @@ class _PaymentMethodCard extends StatelessWidget {
                 color: isSelected ? logoColor : Colors.transparent,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? logoColor : AppColors.textTertiary,
+                  color: isSelected ? logoColor : StitchColors.onSurfaceVariant,
                 ),
               ),
               child: isSelected

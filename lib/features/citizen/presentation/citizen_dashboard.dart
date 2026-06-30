@@ -1,9 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../theme/stitch_colors.dart';
 import '../../../shared/models/fine_model.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../data/providers.dart';
@@ -17,50 +17,50 @@ class CitizenDashboard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final finesAsync = ref.watch(myFinesProvider);
     final auth = ref.watch(authProvider);
-    final unreadCount =
-        ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
+    final unreadCount = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: StitchColors.background,
       body: RefreshIndicator(
+        color: StitchColors.primary,
         onRefresh: () async {
           // ignore: unused_result
           ref.refresh(myFinesProvider);
         },
         child: finesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: CircularProgressIndicator(color: StitchColors.primary)),
           error: (e, _) => Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
                 'Impossible de charger vos contraventions.\n$e',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium,
+                style: GoogleFonts.inter(color: StitchColors.onSurfaceVariant),
               ),
             ),
           ),
           data: (fines) {
-            final pending = fines
-                .where((f) =>
-                    f.status == FineStatus.pending ||
-                    f.status == FineStatus.overdue)
-                .toList();
+            final pending = fines.where((f) => f.status == FineStatus.pending || f.status == FineStatus.overdue).toList();
             final totalDebt = pending.fold<int>(0, (s, f) => s + f.amount);
             return CustomScrollView(
               slivers: [
-                _buildAppBar(context, unreadCount),
+                _buildAppBar(context, auth, unreadCount),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       const SizedBox(height: 16),
-                      _buildProfileBanner(auth, totalDebt, pending.length),
+                      _buildLicenseStatus(context),
+                      const SizedBox(height: 16),
+                      _buildPaymentSummary(pending.length, totalDebt),
                       const SizedBox(height: 24),
                       _buildActiveFines(context, pending),
                       const SizedBox(height: 24),
                       _buildPaidHistory(context, fines),
                       const SizedBox(height: 24),
                       _buildAlerts(fines),
+                      const SizedBox(height: 24),
+                      _buildHelp(),
                       const SizedBox(height: 100),
                     ]),
                   ),
@@ -73,39 +73,17 @@ class CitizenDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildAppBar(BuildContext context, int unreadCount) {
+  Widget _buildAppBar(BuildContext context, AuthState auth, int unreadCount) {
     return SliverAppBar(
       pinned: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: StitchColors.surface,
       surfaceTintColor: Colors.transparent,
       titleSpacing: 16,
       title: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.congoGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.congoGreen.withValues(alpha: 0.35)),
-            ),
-            child: const Icon(Icons.person_rounded, color: AppColors.congoGreen, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Circulation+', style: AppTextStyles.titleSmall),
-              Text(
-                'PORTAIL CITOYEN',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.congoGreen,
-                  fontSize: 9,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
+          const Icon(Icons.security, color: StitchColors.primary, size: 20),
+          const SizedBox(width: 8),
+          Text('Circulation+', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.primary)),
           const Spacer(),
           GestureDetector(
             onTap: () => context.push('/citizen/notifications'),
@@ -113,122 +91,116 @@ class CitizenDashboard extends ConsumerWidget {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: const Icon(Icons.notifications_outlined, size: 20, color: AppColors.textSecondary),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(color: StitchColors.surfaceContainerLow, borderRadius: BorderRadius.circular(10), border: Border.all(color: StitchColors.outlineVariant)),
+                  child: const Icon(Icons.notifications_outlined, size: 18, color: StitchColors.onSurfaceVariant),
                 ),
                 if (unreadCount > 0)
                   Positioned(
                     top: -2, right: -2,
                     child: Container(
                       width: 14, height: 14,
-                      decoration: BoxDecoration(
-                        color: AppColors.error, shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.surface, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          unreadCount > 9 ? '9+' : '$unreadCount',
-                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
-                        ),
-                      ),
+                      decoration: BoxDecoration(color: StitchColors.tertiary, shape: BoxShape.circle, border: Border.all(color: StitchColors.surface, width: 2)),
+                      child: Center(child: Text(unreadCount > 9 ? '9+' : '$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700))),
                     ),
                   ),
               ],
             ),
           ),
+          const SizedBox(width: 10),
+          UserAvatar(size: 32, editable: false, photoUrl: auth.photoUrl, initials: auth.initials, gradient: const LinearGradient(colors: [StitchColors.primary, StitchColors.primaryContainer])),
         ],
       ),
-      bottom: const PreferredSize(
-        preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: AppColors.divider),
-      ),
+      bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: StitchColors.outlineVariant)),
     );
   }
 
-  Widget _buildProfileBanner(AuthState auth, int totalDebt, int pendingCount) {
-    final name = auth.userName ?? 'Citoyen';
-    final phone = auth.telephone ?? '';
-    final email = auth.email ?? '';
-    final initials = auth.initials;
-
+  Widget _buildLicenseStatus(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            if (pendingCount > 0) ...[const Color(0xFF1A0E0A), const Color(0xFF1C1008)]
-            else ...[const Color(0xFF0A1A10), const Color(0xFF0C1C12)],
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: pendingCount > 0
-              ? AppColors.warning.withValues(alpha: 0.3)
-              : AppColors.success.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: StitchColors.surfaceContainerLowest, borderRadius: BorderRadius.circular(12), border: Border.all(color: StitchColors.outlineVariant)),
+      child: Row(
         children: [
-          Row(
-            children: [
-              UserAvatar(
-                size: 52,
-                editable: false,
-                photoUrl: auth.photoUrl,
-                initials: initials,
-                gradient: pendingCount > 0
-                    ? AppColors.warningGradient
-                    : AppColors.successGradient,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: AppTextStyles.titleMedium),
-                    if (phone.isNotEmpty)
-                      Text(phone, style: AppTextStyles.bodySmall),
-                    if (email.isNotEmpty)
-                      Text(email, style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
-                  ],
-                ),
-              ),
-            ],
+          Container(
+            width: 48, height: 48,
+            decoration: BoxDecoration(color: StitchColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: const Icon(Icons.verified_user, color: StitchColors.primary, size: 26),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              _BannerStat(
-                label: 'Amendes actives',
-                value: '$pendingCount',
-                color: pendingCount > 0 ? AppColors.warning : AppColors.success,
-              ),
-              _VerticalDivider(),
-              _BannerStat(
-                label: 'Total dû',
-                value: totalDebt > 0 ? '${(totalDebt / 1000).toStringAsFixed(0)}K FCFA' : '0 FCFA',
-                color: totalDebt > 0 ? AppColors.error : AppColors.success,
-              ),
-              _VerticalDivider(),
-              _BannerStat(
-                label: 'Statut',
-                value: pendingCount > 0 ? 'ALERTE' : 'OK',
-                color: pendingCount > 0 ? AppColors.error : AppColors.success,
-              ),
-            ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Statut de mon permis', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant)),
+                Text.rich(TextSpan(children: [
+                  TextSpan(text: 'VALIDE', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.primary)),
+                ])),
+              ],
+            ),
           ),
+          GestureDetector(onTap: () => context.push('/citizen/license'), child: const Icon(Icons.chevron_right, color: StitchColors.onSurfaceVariant)),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2);
+    ).animate().fadeIn(duration: 400.ms);
+  }
+
+  Widget _buildPaymentSummary(int pendingCount, int totalDebt) {
+    return Builder(builder: (context) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: StitchColors.primaryContainer,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Amendes à payer', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.9))),
+                      Text('${(totalDebt / 1000).toStringAsFixed(0)} 000 FCFA', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ],
+                  ),
+                ),
+                if (pendingCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: 0.2))),
+                    child: Row(children: [
+                      const Icon(Icons.warning, size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Text('$pendingCount en attente', style: GoogleFonts.inter(fontSize: 11, color: Colors.white)),
+                    ]),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () => context.push('/citizen/history'),
+                icon: const Icon(Icons.bolt, size: 18),
+                label: Text('Paiement Rapide', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: StitchColors.secondaryContainer,
+                  foregroundColor: StitchColors.onSecondaryContainer,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1);
+    });
   }
 
   Widget _buildActiveFines(BuildContext context, List<FineModel> fines) {
@@ -237,56 +209,29 @@ class CitizenDashboard extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Container(
-              width: 4,
-              height: 18,
-              decoration: BoxDecoration(
-                color: AppColors.warning,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text('Amendes à payer', style: AppTextStyles.titleMedium),
+            Text('Amendes en cours', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.onSurface)),
             const Spacer(),
-            if (fines.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text('${fines.length} active${fines.length > 1 ? 's' : ''}',
-                    style: AppTextStyles.caption.copyWith(color: AppColors.warning)),
-              ),
+            GestureDetector(onTap: () => context.push('/citizen/history'), child: Text('Tout voir', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: StitchColors.primary))),
           ],
         ),
         const SizedBox(height: 12),
         if (fines.isEmpty)
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
+            decoration: BoxDecoration(color: StitchColors.surfaceContainerLowest, borderRadius: BorderRadius.circular(16), border: Border.all(color: StitchColors.outlineVariant)),
             child: Center(
-              child: Column(
-                children: [
-                  const Icon(Icons.check_circle_outline_rounded, size: 40, color: AppColors.success),
-                  const SizedBox(height: 8),
-                  Text('Aucune amende en attente', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.success)),
-                ],
-              ),
+              child: Column(children: [
+                const Icon(Icons.check_circle_outline_rounded, size: 40, color: StitchColors.primary),
+                const SizedBox(height: 8),
+                Text('Aucune amende en attente', style: GoogleFonts.inter(color: StitchColors.primary)),
+              ]),
             ),
           )
         else
           ...fines.asMap().entries.map((entry) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _CitizenFineCard(fine: entry.value)
-                .animate(delay: Duration(milliseconds: entry.key * 100))
-                .fadeIn(duration: 400.ms)
-                .slideY(begin: 0.1),
-          )),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _CitizenFineCard(fine: entry.value).animate(delay: Duration(milliseconds: entry.key * 100)).fadeIn(duration: 400.ms).slideY(begin: 0.1),
+              )),
       ],
     );
   }
@@ -298,21 +243,17 @@ class CitizenDashboard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 4, height: 18,
-              decoration: BoxDecoration(color: AppColors.success, borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(width: 10),
-            Text('Historique paiements', style: AppTextStyles.titleMedium),
-          ],
-        ),
+        Text('Historique récent', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.onSurface)),
         const SizedBox(height: 12),
-        ...paid.map((fine) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _PaidFineRow(fine: fine),
-        )),
+        SizedBox(
+          height: 110,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: paid.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => _PaidFineRow(fine: paid[i]),
+          ),
+        ),
       ],
     ).animate().fadeIn(delay: 300.ms);
   }
@@ -324,28 +265,36 @@ class CitizenDashboard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 4, height: 18,
-              decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(width: 10),
-            Text('Alertes & rappels', style: AppTextStyles.titleMedium),
-          ],
-        ),
+        Text('Alertes & rappels', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.onSurface)),
         const SizedBox(height: 12),
         ...overdue.map((f) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _AlertCard(
-            icon: Icons.gavel_rounded,
-            title: 'Amende en retard',
-            body: 'Le PV ${f.reference} est en retard. Pénalité +50% applicable.',
-            color: AppColors.error,
-          ),
-        )),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AlertCard(icon: Icons.gavel_rounded, title: 'Amende en retard', body: 'Le PV ${f.reference} est en retard. Pénalité +50% applicable.', color: StitchColors.tertiary),
+            )),
       ],
     ).animate().fadeIn(delay: 400.ms);
+  }
+
+  Widget _buildHelp() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: StitchColors.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          const Icon(Icons.help_outline, color: StitchColors.primary, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Un doute sur une amende ?', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: StitchColors.onSurface)),
+                Text('Consultez nos guides ou contactez le support.', style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -358,88 +307,39 @@ class _CitizenFineCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => context.push('/citizen/fine/${fine.id}'),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: fine.isOverdue
-                ? AppColors.error.withValues(alpha: 0.4)
-                : AppColors.warning.withValues(alpha: 0.3),
-          ),
+          color: StitchColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: StitchColors.outlineVariant),
+          boxShadow: fine.isOverdue ? [BoxShadow(color: StitchColors.error.withValues(alpha: 0.15), blurRadius: 0, offset: const Offset(4, 0))] : null,
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: (fine.isOverdue ? AppColors.error : AppColors.warning).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.gavel_rounded,
-                    color: fine.isOverdue ? AppColors.error : AppColors.warning,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(fine.infractionLabel,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Text(fine.reference,
-                          style: AppTextStyles.mono.copyWith(fontSize: 11, color: AppColors.textTertiary)),
-                    ],
-                  ),
-                ),
-                StatusBadge.fromFineStatus(fine.status),
-              ],
+            if (fine.isOverdue) Container(width: 4, height: 56, color: StitchColors.error, margin: const EdgeInsets.only(right: 10)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Text(fine.isOverdue ? 'EN RETARD' : 'À RÉGLER',
+                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: fine.isOverdue ? StitchColors.error : StitchColors.secondary)),
+                    Text('  •  Réf: ${fine.reference}', style: GoogleFonts.inter(fontSize: 10, color: StitchColors.onSurfaceVariant)),
+                  ]),
+                  const SizedBox(height: 2),
+                  Text(fine.infractionLabel, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: StitchColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text('${fine.deadline.day}/${fine.deadline.month}/${fine.deadline.year}', style: GoogleFonts.courierPrime(fontSize: 12, color: StitchColors.onSurfaceVariant)),
+                ],
+              ),
             ),
-            const SizedBox(height: 14),
-            const Divider(height: 1, color: AppColors.divider),
-            const SizedBox(height: 12),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Montant', style: AppTextStyles.caption),
-                    Text(
-                      '${(fine.amount / 1000).toStringAsFixed(0)} 000 FCFA',
-                      style: AppTextStyles.titleSmall.copyWith(color: AppColors.primary),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('Échéance', style: AppTextStyles.caption),
-                    Text(
-                      '${fine.deadline.day}/${fine.deadline.month}/${fine.deadline.year}',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: fine.isOverdue ? AppColors.error : AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text('Payer',
-                      style: AppTextStyles.labelSmall.copyWith(color: Colors.white)),
-                ),
+                Text('${(fine.amount / 1000).toStringAsFixed(0)} 000', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: StitchColors.onSurface)),
+                Text('FCFA', style: GoogleFonts.inter(fontSize: 10, color: StitchColors.onSurfaceVariant)),
+                const SizedBox(height: 4),
+                StatusBadge.fromFineStatus(fine.status),
               ],
             ),
           ],
@@ -456,66 +356,39 @@ class _PaidFineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: fine.paymentId != null
-          ? () => context.push('/citizen/receipt/${fine.paymentId}')
-          : null,
+      onTap: fine.paymentId != null ? () => context.push('/citizen/receipt/${fine.paymentId}') : null,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.cardBorder),
-        ),
-        child: Row(
+        width: 200,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: StitchColors.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(fine.infractionLabel, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary)),
-                  Text(fine.paymentMethod ?? '', style: AppTextStyles.caption),
-                ],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: StitchColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Text('PAYÉ', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: StitchColors.primary)),
+                ),
+                const Icon(Icons.receipt_outlined, size: 14, color: StitchColors.onSurfaceVariant),
+              ],
             ),
-            Text(
-              '${(fine.amount / 1000).toStringAsFixed(0)}K FCFA',
-              style: AppTextStyles.labelSmall.copyWith(color: AppColors.success),
+            const SizedBox(height: 8),
+            Text(fine.infractionLabel, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: StitchColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text(fine.paymentMethod ?? '', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: StitchColors.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
+                Text('${(fine.amount / 1000).toStringAsFixed(0)}K', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: StitchColors.primary)),
+              ],
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.receipt_outlined, size: 14, color: AppColors.textTertiary),
           ],
         ),
       ),
     );
-  }
-}
-
-class _BannerStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  const _BannerStat({required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(value, style: AppTextStyles.titleMedium.copyWith(color: color)),
-          const SizedBox(height: 2),
-          Text(label, style: AppTextStyles.caption, textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-}
-
-class _VerticalDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 36, color: AppColors.divider);
   }
 }
 
@@ -530,11 +403,7 @@ class _AlertCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.25))),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -544,9 +413,9 @@ class _AlertCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTextStyles.labelSmall.copyWith(color: color)),
+                Text(title, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
                 const SizedBox(height: 4),
-                Text(body, style: AppTextStyles.bodySmall),
+                Text(body, style: GoogleFonts.inter(fontSize: 12, color: StitchColors.onSurfaceVariant)),
               ],
             ),
           ),

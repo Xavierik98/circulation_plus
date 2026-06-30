@@ -62,6 +62,12 @@ const envSchema = z.object({
   // Convocations
   DELAI_CONVOCATION_JOURS: z.coerce.number().int().positive().default(7),
   DELAI_RELANCE_JOURS: z.coerce.number().int().positive().default(14),
+
+  // DEV/TEST UNIQUEMENT — saute la vérification 2FA à la connexion pour
+  // permettre l'exploration manuelle de l'app sans accès aux emails @pnc.cg
+  // fictifs des comptes de démo. À retirer (ou remettre à false) avant mise
+  // en production réelle : voir issueAndSend2faCode / login() dans auth.service.ts.
+  SKIP_2FA_FOR_TESTING: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof envSchema>;

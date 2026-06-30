@@ -330,7 +330,8 @@ export async function login(
   }
 
   // 2FA obligatoire pour les comptes à privilèges (POLICE / ADMIN).
-  if (ROLES_REQUIRING_2FA.includes(user.role)) {
+  // SKIP_2FA_FOR_TESTING : contournement temporaire dev/test (voir env.ts).
+  if (ROLES_REQUIRING_2FA.includes(user.role) && !env.SKIP_2FA_FOR_TESTING) {
     await issueAndSend2faCode(user, adapters);
     const challengeToken = signChallengeToken(user.id);
 

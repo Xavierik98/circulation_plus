@@ -361,121 +361,28 @@ class PncBadge extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(painter: _PncBadgePainter(showGlow: showGlow)),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (showGlow)
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [AppColors.gold.withValues(alpha: 0.30), Colors.transparent],
+                ),
+              ),
+            ),
+          Image.asset(
+            'assets/images/pnc_logo.png',
+            height: size * 0.92,
+            fit: BoxFit.contain,
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _PncBadgePainter extends CustomPainter {
-  final bool showGlow;
-  const _PncBadgePainter({this.showGlow = true});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final center = Offset(w / 2, size.height / 2);
-    final r = w / 2;
-
-    if (showGlow) {
-      canvas.drawCircle(center, r,
-          Paint()..shader = RadialGradient(
-            colors: [AppColors.gold.withValues(alpha: 0.30), Colors.transparent],
-          ).createShader(Rect.fromCircle(center: center, radius: r)));
-    }
-
-    canvas.drawCircle(center, r * 0.95,
-        Paint()..color = AppColors.gold
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = w * 0.065);
-
-    canvas.drawCircle(center, r * 0.855,
-        Paint()..color = AppColors.policeNavy);
-
-    canvas.drawCircle(center, r * 0.775,
-        Paint()..color = AppColors.gold.withValues(alpha: 0.5)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = w * 0.015);
-
-    _drawCongoStripe(canvas, center, r * 0.73);
-    _drawShield(canvas, Offset(center.dx, center.dy + r * 0.06), r * 0.42);
-
-    final starPaint = Paint()..color = AppColors.gold;
-    for (int i = 0; i < 5; i++) {
-      final angle = -math.pi * 0.82 + (math.pi * 0.64) * i / 4;
-      final sc = Offset(
-        center.dx + (r * 0.60) * math.cos(angle),
-        center.dy + (r * 0.60) * math.sin(angle) - r * 0.08,
-      );
-      _drawStar(canvas, sc, r * 0.095, starPaint);
-    }
-  }
-
-  void _drawCongoStripe(Canvas canvas, Offset center, double r) {
-    const sweepAngle = math.pi * 0.55;
-    const startAngle = math.pi * 0.60;
-    final rect = Rect.fromCircle(center: center, radius: r);
-    final colors = [AppColors.congoGreen, AppColors.congoYellow, AppColors.congoRed];
-    for (int i = 0; i < 3; i++) {
-      canvas.drawArc(rect,
-          startAngle + (sweepAngle / 3) * i,
-          sweepAngle / 3,
-          false,
-          Paint()..color = colors[i]
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = r * 0.10
-              ..strokeCap = StrokeCap.butt);
-    }
-  }
-
-  void _drawShield(Canvas canvas, Offset center, double r) {
-    final path = Path()
-      ..moveTo(center.dx - r * 0.9, center.dy - r)
-      ..lineTo(center.dx + r * 0.9, center.dy - r)
-      ..lineTo(center.dx + r * 0.9, center.dy + r * 0.1)
-      ..quadraticBezierTo(
-          center.dx + r * 0.9, center.dy + r * 1.1, center.dx, center.dy + r)
-      ..quadraticBezierTo(
-          center.dx - r * 0.9, center.dy + r * 1.1,
-          center.dx - r * 0.9, center.dy + r * 0.1)
-      ..close();
-
-    canvas.drawPath(path, Paint()..color = AppColors.policeBlue);
-    canvas.drawPath(path,
-        Paint()..color = AppColors.gold
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = r * 0.09);
-
-    final tp = TextPainter(
-      text: TextSpan(
-        text: 'PNC',
-        style: TextStyle(
-          color: AppColors.gold,
-          fontSize: (r * 0.58).clamp(7.0, 28.0),
-          fontWeight: FontWeight.w900,
-          letterSpacing: r * 0.10,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas,
-        Offset(center.dx - tp.width / 2,
-               center.dy - tp.height / 2 + r * 0.12));
-  }
-
-  void _drawStar(Canvas canvas, Offset center, double radius, Paint paint) {
-    final path = Path();
-    for (int i = 0; i < 10; i++) {
-      final angle = (i * math.pi / 5) - math.pi / 2;
-      final len = i.isEven ? radius : radius * 0.42;
-      final pt = Offset(
-          center.dx + len * math.cos(angle),
-          center.dy + len * math.sin(angle));
-      i == 0 ? path.moveTo(pt.dx, pt.dy) : path.lineTo(pt.dx, pt.dy);
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

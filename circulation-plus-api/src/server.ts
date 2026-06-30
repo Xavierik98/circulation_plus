@@ -8,6 +8,13 @@ async function main(): Promise<void> {
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
     app.log.info(`Circulation+ API démarrée sur le port ${env.PORT}`);
 
+    if (env.SKIP_2FA_FOR_TESTING) {
+      app.log.warn(
+        '⚠️⚠️⚠️  SKIP_2FA_FOR_TESTING=true — la double authentification POLICE/ADMIN est DÉSACTIVÉE. '
+        + 'À retirer de la configuration dès la fin des tests. ⚠️⚠️⚠️',
+      );
+    }
+
     scheduleDbBackup();
     if (env.SUPABASE_DATABASE_URL) {
       app.log.info('[backup] Sauvegarde Neon → Supabase planifiée toutes les 6h');

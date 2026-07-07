@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../../theme/stitch_colors.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../theme/app_text_styles.dart';
 import '../../../../shared/models/infraction_model.dart';
+import '../../../../shared/widgets/premium_button.dart';
 import '../../../../data/providers.dart';
 import '../../../../shared/models/interpellation_state.dart';
 
@@ -17,268 +18,336 @@ class InfractionSelectionScreen extends ConsumerStatefulWidget {
 }
 
 class _InfractionSelectionScreenState extends ConsumerState<InfractionSelectionScreen> {
-  final _searchCtrl = TextEditingController();
+  InfractionCategory? _selectedCategory;
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  static const _categoryMeta = {
-    InfractionCategory.speed: ('Vitesse', Icons.speed, StitchColors.primary),
-    InfractionCategory.safety: ('Sécurité', Icons.health_and_safety, StitchColors.primary),
-    InfractionCategory.documents: ('Documents Obligatoires', Icons.description, StitchColors.tertiary),
-    InfractionCategory.behavior: ('Comportement', Icons.psychology, StitchColors.secondary),
-    InfractionCategory.parking: ('Stationnement', Icons.local_parking, StitchColors.onSurfaceVariant),
-  };
-
-  String _fmtAmount(int amount) {
-    final s = amount.toString();
-    final buf = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      buf.write(s[i]);
-      final remaining = s.length - 1 - i;
-      if (remaining > 0 && remaining % 3 == 0) buf.write(',');
-    }
-    return buf.toString();
+  List<InfractionType> _filter(List<InfractionType> all) {
+    if (_selectedCategory == null) return all;
+    return all.where((i) => i.category == _selectedCategory).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final selected = ref.watch(selectedInfractionsProvider);
     final totalAmount = selected.fold<int>(0, (sum, i) => sum + i.fineAmount);
-    final query = _searchCtrl.text.trim().toLowerCase();
 
     return Scaffold(
-      backgroundColor: StitchColors.background,
-      body: SafeArea(
-        child: Column(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        leading: GestureDetector(
+          onTap: () => context.pop(),
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // TopAppBar
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: const BoxDecoration(
-                color: StitchColors.surface,
-                border: Border(bottom: BorderSide(color: StitchColors.outlineVariant)),
-              ),
-              child: Row(
-                children: [
-                  IconButton(icon: const Icon(Icons.arrow_back, color: StitchColors.primary, size: 20), onPressed: () => context.pop()),
-                  const Icon(Icons.security, color: StitchColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Circulation+', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: StitchColors.primary)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ref.watch(infractionsProvider).when(
-                    loading: () => const Center(child: CircularProgressIndicator(color: StitchColors.primary)),
-                    error: (e, _) => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text('Catalogue indisponible.\n$e', textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(color: StitchColors.onSurfaceVariant)),
-                      ),
-                    ),
-                    data: (all) {
-                      final filtered = query.isEmpty
-                          ? all
-                          : all.where((i) =>
-                              i.labelFr.toLowerCase().contains(query) || i.code.toLowerCase().contains(query)).toList();
-                      final grouped = <InfractionCategory, List<InfractionType>>{};
-                      for (final inf in filtered) {
-                        grouped.putIfAbsent(inf.category, () => []).add(inf);
-                      }
-
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Nouvelle Infraction', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: StitchColors.onSurface)),
-                            const SizedBox(height: 4),
-                            Text('Sélectionnez le ou les types d\'infractions constatées lors du contrôle.',
-                                style: GoogleFonts.inter(fontSize: 14, color: StitchColors.onSurfaceVariant)),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _searchCtrl,
-                              onChanged: (_) => setState(() {}),
-                              style: GoogleFonts.inter(fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: 'Rechercher une infraction...',
-                                prefixIcon: const Icon(Icons.search, color: StitchColors.onSurfaceVariant),
-                                filled: true,
-                                fillColor: StitchColors.surfaceContainerLowest,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: StitchColors.outlineVariant)),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: StitchColors.outlineVariant)),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: StitchColors.primary, width: 2)),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            for (final entry in grouped.entries) _buildCategorySection(entry.key, entry.value, selected),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-            ),
+            Text('Sélection des infractions', style: AppTextStyles.titleSmall),
+            Text('Étape 4 sur 6', style: AppTextStyles.caption),
           ],
         ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(4),
+          child: LinearProgressIndicator(
+            value: 0.67,
+            backgroundColor: AppColors.surfaceVariant,
+            color: AppColors.primary,
+            minHeight: 3,
+          ),
+        ),
       ),
-      bottomNavigationBar: selected.isEmpty
-          ? null
-          : Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              decoration: BoxDecoration(
-                color: StitchColors.surfaceContainerLow,
-                border: const Border(top: BorderSide(color: StitchColors.outlineVariant)),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -4))],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('TOTAL PROVISOIRE', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: StitchColors.onSurfaceVariant)),
-                          Text('${_fmtAmount(totalAmount)} FCFA',
-                              style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: StitchColors.primary)),
-                          Text('${selected.length} infraction${selected.length > 1 ? "s" : ""}', style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)),
-                        ],
+      body: Column(
+        children: [
+          // Category filter
+          _buildCategoryFilter(),
+
+          // List
+          Expanded(
+            child: ref.watch(infractionsProvider).when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Catalogue indisponible.\n$e',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMedium,
                       ),
                     ),
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () => context.push('/police/fine-calc'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: StitchColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                        ),
-                        child: Row(
-                          children: [
-                            Text('SUIVANT', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_forward, size: 18),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                  data: (all) {
+                    final list = _filter(all);
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final inf = list[index];
+                        final isSelected =
+                            selected.any((s) => s.id == inf.id);
+                        return _InfractionTile(
+                          infraction: inf,
+                          isSelected: isSelected,
+                          onToggle: () {
+                            final current = List<InfractionType>.from(
+                                ref.read(selectedInfractionsProvider));
+                            if (isSelected) {
+                              current.removeWhere((s) => s.id == inf.id);
+                            } else {
+                              current.add(inf);
+                            }
+                            // Mise à jour des deux providers simultanément
+                            ref.read(selectedInfractionsProvider.notifier)
+                                .state = current;
+                            ref.read(interpellationProvider.notifier)
+                                .setInfractions(current);
+                          },
+                        )
+                            .animate(delay: Duration(milliseconds: index * 50))
+                            .fadeIn(duration: 300.ms)
+                            .slideX(begin: 0.05, end: 0);
+                      },
+                    );
+                  },
                 ),
-              ),
-            ).animate().slideY(begin: 1, end: 0, duration: 250.ms),
+          ),
+
+          // Bottom total bar
+          if (selected.isNotEmpty)
+            _buildBottomBar(selected, totalAmount),
+        ],
+      ),
     );
   }
 
-  Widget _buildCategorySection(InfractionCategory cat, List<InfractionType> items, List<InfractionType> selected) {
-    final meta = _categoryMeta[cat]!;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(meta.$2, size: 18, color: meta.$3),
-              const SizedBox(width: 8),
-              Text(meta.$1.toUpperCase(),
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: meta.$3)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          for (final inf in items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _InfractionCheckTile(
-                infraction: inf,
-                isSelected: selected.any((s) => s.id == inf.id),
-                onToggle: () {
-                  final current = List<InfractionType>.from(ref.read(selectedInfractionsProvider));
-                  final isSel = current.any((s) => s.id == inf.id);
-                  if (isSel) {
-                    current.removeWhere((s) => s.id == inf.id);
-                  } else {
-                    current.add(inf);
-                  }
-                  ref.read(selectedInfractionsProvider.notifier).state = current;
-                  ref.read(interpellationProvider.notifier).setInfractions(current);
-                },
+  Widget _buildCategoryFilter() {
+    final categories = [
+      (null, 'Tout', Icons.grid_view_rounded),
+      (InfractionCategory.speed, 'Vitesse', Icons.speed_rounded),
+      (InfractionCategory.safety, 'Sécurité', Icons.health_and_safety_rounded),
+      (InfractionCategory.documents, 'Documents', Icons.description_outlined),
+      (InfractionCategory.behavior, 'Comportement', Icons.psychology_rounded),
+      (InfractionCategory.parking, 'Parking', Icons.local_parking_rounded),
+    ];
+
+    return Container(
+      height: 48,
+      color: AppColors.surface,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final (cat, label, icon) = categories[i];
+          final isSelected = _selectedCategory == cat;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedCategory = cat),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.cardBorder,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 13,
+                      color: isSelected ? Colors.white : AppColors.textTertiary),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: isSelected ? Colors.white : AppColors.textTertiary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _fmtAmount(int amount) {
+    if (amount < 1000) return amount.toString();
+    final t = amount ~/ 1000;
+    final r = amount % 1000;
+    return r == 0 ? '$t 000' : '$t ${r.toString().padLeft(3, '0')}';
+  }
+
+  Widget _buildBottomBar(List<InfractionType> selected, int total) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${selected.length} infraction${selected.length > 1 ? 's' : ''}',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  Text(
+                    '${_fmtAmount(total)} FCFA',
+                    style: AppTextStyles.titleMedium.copyWith(color: AppColors.primary),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 180,
+              child: PremiumButton(
+                label: 'Continuer',
+                icon: Icons.arrow_forward_rounded,
+                height: 48,
+                onPressed: () => context.push('/police/fine-calc'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _InfractionCheckTile extends StatelessWidget {
+class _InfractionTile extends StatelessWidget {
   final InfractionType infraction;
   final bool isSelected;
   final VoidCallback onToggle;
 
-  const _InfractionCheckTile({required this.infraction, required this.isSelected, required this.onToggle});
+  const _InfractionTile({
+    required this.infraction,
+    required this.isSelected,
+    required this.onToggle,
+  });
+
+  Color get _categoryColor {
+    return switch (infraction.category) {
+      InfractionCategory.speed => AppColors.error,
+      InfractionCategory.safety => AppColors.warning,
+      InfractionCategory.documents => AppColors.info,
+      InfractionCategory.behavior => AppColors.accent,
+      InfractionCategory.parking => AppColors.textTertiary,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onToggle,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected ? StitchColors.primaryFixed.withValues(alpha: 0.08) : StitchColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? StitchColors.primary : StitchColors.outlineVariant, width: isSelected ? 1.5 : 1),
+          color: isSelected
+              ? AppColors.primaryGlow
+              : AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.cardBorder,
+            width: isSelected ? 1.5 : 1,
+          ),
         ),
         child: Row(
           children: [
-            Checkbox(
-              value: isSelected,
-              onChanged: (_) => onToggle(),
-              activeColor: StitchColors.primary,
-              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(4))),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(infraction.labelFr, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: StitchColors.onSurface)),
-                    Text(infraction.code, style: GoogleFonts.inter(fontSize: 11, color: StitchColors.onSurfaceVariant)),
-                  ],
-                ),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _categoryColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(infraction.icon, style: const TextStyle(fontSize: 20)),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: StitchColors.primaryFixed.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6)),
-              child: Text('${_fmt(infraction.fineAmount)} FCFA',
-                  style: GoogleFonts.courierPrime(fontSize: 13, fontWeight: FontWeight.bold, color: StitchColors.primary)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(infraction.labelFr, style: AppTextStyles.bodyMedium.copyWith(
+                    color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                  )),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          infraction.code,
+                          style: AppTextStyles.mono.copyWith(fontSize: 9, color: AppColors.textTertiary),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (infraction.pointsDeducted > 0)
+                        Text(
+                          '-${infraction.pointsDeducted} pts',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.error),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${(infraction.fineAmount / 1000).toStringAsFixed(0)}K',
+                  style: AppTextStyles.titleSmall.copyWith(
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
+                Text('FCFA', style: AppTextStyles.caption),
+              ],
+            ),
+            const SizedBox(width: 12),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.textTertiary,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                  : null,
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _fmt(int amount) {
-    final s = amount.toString();
-    final buf = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      buf.write(s[i]);
-      final remaining = s.length - 1 - i;
-      if (remaining > 0 && remaining % 3 == 0) buf.write(',');
-    }
-    return buf.toString();
   }
 }

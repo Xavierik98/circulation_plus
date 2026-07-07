@@ -162,6 +162,25 @@ class InterpellationState {
 class InterpellationNotifier extends StateNotifier<InterpellationState> {
   InterpellationNotifier() : super(const InterpellationState());
 
+  // Verrou de soumission — protège contre une double création de PV si deux
+  // instances de l'écran de confirmation venaient à être montées en même
+  // temps (ex: double-tap sur "Valider l'interpellation" malgré la garde
+  // côté écran de signature). Partagé car le provider est un singleton.
+  bool _submitLock = false;
+
+  /// Tente d'acquérir le verrou de soumission. Renvoie false si une
+  /// soumission est déjà en cours — l'appelant doit alors abandonner
+  /// silencieusement plutôt que d'envoyer une deuxième requête.
+  bool tryAcquireSubmitLock() {
+    if (_submitLock) return false;
+    _submitLock = true;
+    return true;
+  }
+
+  void releaseSubmitLock() {
+    _submitLock = false;
+  }
+
   void updateDriver({
     String? name,
     String? license,

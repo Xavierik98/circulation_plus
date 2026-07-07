@@ -20,6 +20,17 @@ class _SignatureScreenState extends ConsumerState<SignatureScreen> {
   List<Offset> _currentStroke = [];
   bool _hasSignature = false;
   bool _refusedToSign = false;
+  // Empêche un double-appui rapide de pousser l'écran de confirmation deux
+  // fois (ce qui déclenchait deux soumissions de PV quasi simultanées, la
+  // seconde étant bloquée par la protection anti-doublon serveur).
+  bool _isNavigating = false;
+
+  Future<void> _navigateOnce(String route) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    await context.push(route);
+    if (mounted) _isNavigating = false;
+  }
 
   void _onPanStart(DragStartDetails details) {
     setState(() {
@@ -178,14 +189,14 @@ class _SignatureScreenState extends ConsumerState<SignatureScreen> {
               PremiumButton(
                 label: 'Procéder à la saisie des documents',
                 icon: Icons.folder_open_outlined,
-                onPressed: () => context.push('/police/refusal'),
+                onPressed: () => _navigateOnce('/police/refusal'),
               ).animate().fadeIn()
             else
               PremiumButton(
                 label: 'Valider l\'interpellation',
                 icon: Icons.check_circle_outline_rounded,
                 onPressed: _hasSignature
-                    ? () => context.push('/police/confirmation')
+                    ? () => _navigateOnce('/police/confirmation')
                     : null,
               ).animate().fadeIn(delay: 400.ms),
 

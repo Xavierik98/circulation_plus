@@ -50,6 +50,14 @@ class _InterpellationConfirmationScreenState
   }
 
   Future<void> _submitPv() async {
+    final notifier = ref.read(interpellationProvider.notifier);
+    if (!notifier.tryAcquireSubmitLock()) {
+      // Une autre instance de cet écran a déjà une soumission en cours
+      // (ex: double-tap ayant poussé la route deux fois) — on ne renvoie
+      // pas une deuxième requête, la première ira à son terme normalement.
+      return;
+    }
+
     final interp = ref.read(interpellationProvider);
     setState(() {
       _isSubmitting = true;
@@ -104,6 +112,8 @@ class _InterpellationConfirmationScreenState
       }
     } catch (e) {
       await _saveOfflineAndShowSuccess(interp);
+    } finally {
+      notifier.releaseSubmitLock();
     }
   }
 
